@@ -1,0 +1,175 @@
+\documentclass[a4paper,11pt]{article}
+%\documentclass[a4paper,9pt,landscape]{article}
+\usepackage[english]{babel}
+%\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{fullpage}
+\usepackage{amsmath}
+\usepackage{pdfpages}
+\usepackage{listings}
+\usepackage{color}
+\usepackage{multicol}
+\usepackage{fancyhdr}
+\usepackage[top=1.5cm, bottom=4cm, left=2.5cm, right=2.5cm]{geometry}
+\usepackage{hyperref}
+\usepackage{verbatim}
+\setlength{\voffset}{-9pt}
+%\setlength{\hoffset}{-1in}
+%\setlength{\marginparsep}{0.5cm}
+
+
+\setlength{\parindent}{0cm}
+%\setlength{\parskip}{-0.1cm}
+%\setlength{\columnseprule}{0.4pt}
+\setlength{\footskip}{0.5cm}
+\setlength{\headheight}{15pt}
+\setlength{\headsep}{2cm}
+
+\fancypagestyle{tcr}{%
+  \fancyhf{} %clear all headers and footers fields
+  \fancyhead[R]{\thepage}
+  \fancyhead[L]{\textbf{Assignment No 1 TDTS06}}
+  \renewcommand{\headrulewidth}{0.4pt}
+}
+
+\definecolor{dkgreen}{rgb}{0,0.6,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{mauve}{rgb}{0.58,0,0.82}
+\lstset{
+  title=\lstname,
+  frame=t,
+  %aboveskip=-0.5cm, 
+  %belowskip=0pt,
+  basicstyle=\footnotesize\ttfamily,
+  keywordstyle=\color{blue},          % keyword style
+  commentstyle=\color{dkgreen},       % comment style
+  stringstyle=\color{mauve},         % string literal style
+  showstringspaces=false,         % underline spaces within strings
+  tabsize=2,
+  language=C,
+  title=\caption,
+  %xleftmargin=-1cm
+}
+
+
+\begin{document}
+%% title stuff
+\title{Assignment No 1 TDDC78}
+\author{Linus Mellberg (linme560)}
+\date{\today}
+\maketitle
+\pagebreak
+%\setcounter{page}{1}
+%\begin{multicols}{2}
+\thispagestyle{tcr}
+\pagestyle{tcr}
+%\tableofcontents
+
+\section{Task A}
+\subsection{GET Message}
+\begin{verbatim}
+    GET /wireshark-labs/HTTP-wireshark-file1.html HTTP/1.1\r\n
+    Host: gaia.cs.umass.edu\r\n
+    Connection: keep-alive\r\n
+    Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n
+    User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko)
+        Chrome/29.0.1547.62 Safari/537.36\r\n
+    Referer: http://www.ida.liu.se/~TDTS06/labs/2013/Wireshark_HTTP/default.html\r\n
+    Accept-Encoding: gzip,deflate,sdch\r\n
+    Accept-Language: sv-SE,sv;q=0.8,en-US;q=0.6,en;q=0.4\r\n
+    \r\n
+\end{verbatim}
+
+\subsection{Response Message}
+\begin{verbatim}
+    HTTP/1.1 200 OK\r\n
+    Date: Tue, 03 Sep 2013 11:17:59 GMT\r\n
+    Server: Apache/2.2.3 (CentOS)\r\n
+    Last-Modified: Tue, 03 Sep 2013 11:17:01 GMT\r\n
+    ETag: "8734d-80-d3e9e540"\r\n
+    Accept-Ranges: bytes\r\n
+    Content-Length: 128\r\n
+    Keep-Alive: timeout=10, max=100\r\n
+    Connection: Keep-Alive\r\n
+    Content-Type: text/html; charset=UTF-8\r\n
+    \r\n
+    <html>\n
+    Congratulations.  You've downloaded the file \n
+    http://gaia.cs.umass.edu/wireshark-labs/HTTP-wireshark-file1.html!\n
+    </html>\n
+\end{verbatim}
+
+\subsection{Answers}
+\begin{enumerate}
+  \item The first line in the GET/Response messages states that both the browser and the browser uses HTTP version 1.1
+  \item The Accept-Language header states that it prefers swedish (sv-SE) then swedish (sv) then american english (en-US) and then english (en).
+    The Accept header states that it reads all media types but prefers: text/html or application/xhtml+xml. application/xml is also supported.
+    The Accept-Encoding states that the browser supports the following encodings: gzip, deflate and sdch.
+    To get to the page it requested a link from http://www.ida.liu.se/~TDTS06/labs/2013/Wireshark\_HTTP/default.html was followed (the Referer header).
+  \item My ip adress is 130.236.209.246, the servers ip adress is 128.119.245.12.
+  \item The returned status code is 200 OK.
+  \item The file was last modified on Tue, 03 Sep 2013 11:17:01 GMT.
+  \item There is 128 bytes of content returned.
+  \item No I cannot find any http headers that is not displayed in the ''packet details'' pane.
+\end{enumerate}
+
+\section{Task B}
+
+\subsection{Answers}
+\begin{enumerate}
+    \setcounter{enumi}{7}
+  \item No, there is no If-Modified-Since header.
+  \item Yes, the entire content of the page is returned. If the line with \emph{Line-based text data: text/html} is clicked the the content of the data is shown. The Return code 200 also is a indication that the data was transmitted normally.
+  \item When using Google Chrome there is no difference between the two requests (except for some timestamps). 
+    Firefox on the other hand sends this header followed by \emph{Tue, 03 Sep 2013 12:54:01 GMT\textbackslash r\textbackslash n} which is the the value recieved in the Last-Modified header in the previous response from the server.
+  \item The response code is \emph{304 Not Modified}, which indicates that the pages has not been modified since the previously supplied datestamp. The content of the file is not sent since the If-Modified-Since header indicates that the browser already has a cached version of the page.
+\end{enumerate}
+
+The captured data above shows how the browser uses caching to avoid downloading content when this is not needed. It also shows that the HTTP protocol has features which makes this possible. Chrome doesn't seem to cache this page, I'm not sure why but a guess is that the content of the page is so small that caching it isn't justified by the small gain in bandwidth usage that is gained from it.
+
+\section{Task C}
+
+\subsection{Answers}
+\begin{enumerate}
+    \setcounter{enumi}{11}
+  \item One GET request was sent.
+  \item There are four data-containing TCP packets used to deliver the response from the server to the client. There are also four more sent from the client to the server to ACK these four data packets.
+  \item The status code is 200 OK.
+  \item No there is no data about segementation data in the HTTP headers, the HTTP protocol operates at the application layer and don't need to know/care about how the tcp protocol is working.
+\end{enumerate}
+
+This task shows the benefits of the layered model that is used for internet and other data networks. 
+A lot of SYN/ACK and data packets was sent by the TCP protocol but the applications sees nothing of this and only needs to implement the HTTP protocol.
+
+\section{Task D}
+
+\subsection{Answers}
+\begin{enumerate}
+    \setcounter{enumi}{15}
+  \item Three GET requests are sent one for the page and one for each image. 
+    The page request is sent to gaia.cs.umass.edu (128.119.245.12) the images are requested from www.pearsonhighered.com (165.193.140.14) and manic.cs.umass.edu (128.119.240.90).
+  \item The images are downloaded in parallel, the second GET request is sent before the response for the first one has arrived.
+\end{enumerate}
+
+Task D shows that a webpage consist of many different object, which all have to be downloaded with separate http requests.
+
+\section{Task E}
+
+\subsection{Answers}
+\begin{enumerate}
+    \setcounter{enumi}{19}
+  \item \emph{Connection: Keep-Alive} means that the TCP socket should remain open after the response has been finished.
+    \emph{Connection: Close} means that the TCP socket should be closed after the response.
+\end{enumerate}
+
+In HTTP 1.1 persistent connections where supported to avoid opening new connections for every request.
+The Connection header is used to make it possible for the browser to express that it does not want to use a persistent connnection by sending \emph{Connection: Close} in its request.
+%\begin{figure}[!h]
+%  \caption{Traceanalyzer chart for im4.ppm on 8 cores with radius 10.}
+%  \label{trace}
+%  \includegraphics[width=500pt]{../plots/tracechart_r10_im4_8cores.png}
+%\end{figure}
+
+%\clearpage
+
+\end{document}
