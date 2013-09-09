@@ -15,6 +15,12 @@
 
 #include <netdb.h>
 #include <string>
+#include <stdexcept>
+
+class ConnectionException : public std::logic_error {
+ public:
+  explicit ConnectionException(const std::string& what)throw() :logic_error(what) {};
+};
 
 class Connection{
 public:
@@ -23,13 +29,19 @@ public:
 	Connection& operator=(const Connection &rhs);
 	~Connection();
 
-	void send(const std::string *data);
-	std::string *recv(char term);
-	std::string *recv(int len);
+	void sendString(const std::string *data);
+	std::string *recvString(char term);
+	std::string *recvString(int len);
+
+//private:
+	void appendRBuff(std::string *s, int len);
+	void updateRBuff();
 
 	int socket;
 	addrinfo *addr;
 	char *rBuff;
+	int rBuffPos;
+	int rBuffLength;
 	char *sBuff;
 	std::string data;
 };

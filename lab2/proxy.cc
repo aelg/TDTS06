@@ -6,6 +6,7 @@
 #include <netdb.h>
 #include <cstring>
 #include <map>
+#include <string>
 
 #include "Server.h"
 #include "proxy.h"
@@ -17,17 +18,18 @@ void *connectionHandler(void *args){
 	browserConnection = (Connection*) args;
 	char r[2000];
 	int len;
-	const char *buff = "HTTP/1.1 200 OK\r\n\
+	string* s = new string("HTTP/1.1 200 OK\r\n\
 Content-Length: 36\r\n\
 Connection: Close\r\n\
 Content-Type: text/html; charset=ASCII\r\n\
 \r\n\
-<html><body>OHOHOHO!</body></html>\r\n";
+<html><body>OHOHOHO!</body></html>\r\n");
 
 	len = recv(browserConnection->socket, r, 2000, 0);
 	r[len] = 0;
 	cout << r << endl;
-	send(browserConnection->socket, buff, strlen(buff), 0);
+	//send(browserConnection->socket, buff, strlen(buff), 0);
+	browserConnection->sendString(s);
 	shutdown(browserConnection->socket, STOP_RECEIVING);
 
 	delete browserConnection;
