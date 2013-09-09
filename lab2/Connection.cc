@@ -58,6 +58,7 @@ void Connection::sendString(const std::string *data){
 		else{
 			memcpy(sBuff, data->c_str()+pos, len);
 			send(socket, sBuff, len, 0);
+			len = 0;
 		}
 	}
 	delete data;
@@ -67,7 +68,7 @@ string *Connection::recvString(char term){return NULL;}
 
 string *Connection::recvString(int len){
 	string *s = new string();
-	for(;;){
+	for(;len > 0;){
 		if(rBuffLength > len){
 			appendRBuff(s, len);
 			len = 0;
