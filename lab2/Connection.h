@@ -11,8 +11,6 @@
 #ifndef CONNECTION_H_
 #define CONNECTION_H_
 
-#define BUFFLENGTH 1024
-
 #include <netdb.h>
 #include <string>
 #include <stdexcept>
@@ -24,26 +22,26 @@ class ConnectionException : public std::logic_error {
 
 class Connection{
 public:
-	Connection();
+	Connection(int socket, addrinfo *addr);
 	Connection(const Connection &old);
 	Connection& operator=(const Connection &rhs);
 	~Connection();
 
 	void sendString(const std::string *data);
-	std::string *recvString(char term);
-	std::string *recvString(int len);
+	std::string *recvTerminatedString(char term);
+	std::string *recvString(size_t len);
 
-//private:
-	void appendRBuff(std::string *s, int len);
+private:
+	void appendRBuff(std::string *s, size_t len);
 	void updateRBuff();
+	char *getRBuff();
 
 	int socket;
 	addrinfo *addr;
 	char *rBuff;
-	int rBuffPos;
-	int rBuffLength;
+	size_t rBuffPos;
+	size_t rBuffLength;
 	char *sBuff;
-	std::string data;
 };
 
 #endif /* CONNECTION_H_ */

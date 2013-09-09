@@ -62,12 +62,6 @@ Server::Server(const char* port) : port(port){
       continue;
     }
 
-    /*if(fcntl(s, F_SETFL, O_NONBLOCK) == -1){
-      shutdown(s, STOP_RECEIVING);
-      cerr << "setting nonblock failed, trying next addrinfo" << endl;
-      continue;
-    }*/
-
     // Set reuseraddr.
     if(setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1){
       cerr  << "setsockopt failed, trying next addrinfo" << endl;
@@ -84,10 +78,10 @@ Server::Server(const char* port) : port(port){
     break;
   }
 
-  //Not needed.
+  //Not needed any more.
   freeaddrinfo(servinfo);
 
-  // Test socket.
+  // Test if socket was found.
   if (p == 0)
     throw(ServerException("failed to bind!"));
 
@@ -107,91 +101,16 @@ Connection *Server::acceptNew(){
   
   struct sockaddr_storage *their_addr;
   socklen_t addr_size;
-
   int newSocket = 0;
-
-  Connection *newConnection = new Connection;
-
 
   their_addr = new sockaddr_storage;
   addr_size = sizeof their_addr;
   if((newSocket = accept(s, (sockaddr*) their_addr, &addr_size)) == -1){
-  	if (errno == EWOULDBLOCK || errno == EAGAIN){
-  		delete their_addr;
-  		cout << "No new connections" << endl;
-  		return NULL;
-  	}
-  	else throw(ServerException(string("accept failed") + string(gai_strerror(newSocket))));
+  	throw(ServerException(string("accept failed") + string(gai_strerror(newSocket))));
   }
 
   cout << "New connection." << endl;
-  if(fcntl(newSocket, F_SETFL, O_NONBLOCK) == -1){
-  	shutdown(newSocket, STOP_RECEIVING);
-  	delete their_addr;
-  	cerr << "setting nonblock failed, connection closed" << endl;
-  	return NULL;
-  }
-  newConnection->socket = newSocket;
-  newConnection->addr = (addrinfo*) their_addr;
 
-  return newConnection;
+  return new Connection(newSocket, (addrinfo*)their_addr);
 
 }
-
-/*
-  for(vector<Connection>::iterator it = newlyAccepted.begin(); it != newlyAccepted.end(); ++it){
-
-    int res;
-    if((res = recv(it->socket, it->buff, DATALENGTH, 0)) != -1){
-      if(errno != EWOULDBLOCK && errno != EAGAIN){
-        // Bad socket remove.
-    	shutdown(it->socket, STOP_RECEIVING);
-        it = newlyAccepted.erase(it);
-        --it;
-      }
-      else { // Har skickat data
-        it->data.append(it->buff, 0, res);
-        size_t pos;
-        bool login;
-        if(it->data[0] == 'n' || it->data[0] == 'l'){
-          if(it->data[0] == 'n') login = false;
-          else login = true;
-          it->data.erase(0,1);
-        }
-        else{
-          it->data.erase();
-          return;
-        }
-        if((pos = it->data.find(" #", it->data.find_first_of(' ')+1)) != string::npos){ // Korrekt autentiseringsdata.
-          cout << "Autentiserar: " << string(it->data, 0, it->data.find_first_of(' ')) << endl;
-          // Fr�ga UserRegister om vi har f�tt r�tt uppgifter
-          string user(it->data, 0, it->data.find_first_of(' '));
-          it->data.erase(0, it->data.find_first_of(' ') + 1);
-          string pass(it->data, 0, it->data.find(" #"));
-          it->data.erase(0, it->data.find(" #") + 3);
-
-          AuthMessage auth(user, pass, ++idCount);
-          if(login)
-            sendMessage("UserRegister", AUTH,  auth.serialize());
-          else
-            sendMessage("UserRegister", CREATEUSER,  auth.serialize());
-
-          waitingForAuthentication.insert(make_pair(idCount, *it));
-          it = newlyAccepted.erase(it);
-          --it;
-        }
-        else {
-          size_t pos = it->data.find_last_of('\n');
-          if(pos == string::npos)
-            it->data.erase();
-          else
-            it->data.erase(0, it->data.find_last_of('\n')+1);
-        }
-      }
-    }
-  }
-
-  cout << newConnection.data;
-  return;
-}
-*/
