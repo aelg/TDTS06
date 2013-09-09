@@ -10,20 +10,23 @@
 
 #include "Connection.h"
 
-Connection::Connection() : socket(), addr(0), buff(new char[BUFFLENGTH]), data(){}
+Connection::Connection() : socket(), addr(0), rBuff(new char[BUFFLENGTH]),
+		sBuff(new char[BUFFLENGTH]), data(){}
 
 Connection::Connection(const Connection &old): socket(old.socket), addr(old.addr),
-		buff(new char[BUFFLENGTH]), data(old.data)
+		rBuff(new char[BUFFLENGTH]), sBuff(new char[BUFFLENGTH]), data(old.data)
 {
 	for(int i = 0; i < BUFFLENGTH; ++i){
-		buff[i] = old.buff[i];
+		rBuff[i] = old.rBuff[i];
+		sBuff[i] = old.sBuff[i];
 	}
 }
 
 Connection& Connection::operator=(const Connection &rhs){
 	if (this == &rhs) return *this;
 	for(int i = 0; i < BUFFLENGTH; ++i){
-		buff[i] = rhs.buff[i];
+		rBuff[i] = rhs.rBuff[i];
+		sBuff[i] = rhs.sBuff[i];
 	}
 	socket = rhs.socket;
 	addr = rhs.addr;
@@ -32,6 +35,7 @@ Connection& Connection::operator=(const Connection &rhs){
 }
 
 Connection::~Connection(){
-	delete[] buff;
+	delete[] rBuff;
+	delete[] sBuff;
 	//if(addr) delete addr;
 }

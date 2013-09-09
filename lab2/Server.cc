@@ -20,7 +20,6 @@
 #include <pthread.h>
 
 #include "Server.h"
-#include "proxy.h"
 
 using namespace std;
 
@@ -47,7 +46,7 @@ Server::Server(const char* port) : port(port){
   // TCP
   hints.ai_socktype = SOCK_STREAM;
 
-  // Listen to default adress.
+  // Listen to default address.
   hints.ai_flags = AI_PASSIVE;
 
   // Get addrinfo
@@ -71,16 +70,16 @@ Server::Server(const char* port) : port(port){
 
     // Set reuseraddr.
     if(setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1){
-      shutdown(s, STOP_RECEIVING);
       cerr  << "setsockopt failed, trying next addrinfo" << endl;
       continue;
     }
 
     // Bind socket.
     if(bind(s, p->ai_addr, p->ai_addrlen) == -1){
-      shutdown(s, STOP_RECEIVING);
-      cerr  << "bind failed, trying next addrinfo" << endl;
-      continue;
+      cerr  << string("bind failed: \"") +
+      		     string(strerror(errno)) +
+      		     string("\" trying next addrinfo") << endl;
+      break;
     }
     break;
   }
@@ -104,16 +103,14 @@ Server::~Server(){
   shutdown(s, STOP_RECEIVING);
 }
 
-void Server::acceptNew(){
+Connection *Server::acceptNew(){
   
   struct sockaddr_storage *their_addr;
   socklen_t addr_size;
 
   int newSocket = 0;
-  pthread_t threadId;
 
   Connection *newConnection = new Connection;
-  memset(newConnection->buff, 0, DATALENGTH);
 
 
   their_addr = new sockaddr_storage;
@@ -122,7 +119,7 @@ void Server::acceptNew(){
   	if (errno == EWOULDBLOCK || errno == EAGAIN){
   		delete their_addr;
   		cout << "No new connections" << endl;
-  		return;
+  		return NULL;
   	}
   	else throw(ServerException(string("accept failed") + string(gai_strerror(newSocket))));
   }
@@ -132,13 +129,12 @@ void Server::acceptNew(){
   	shutdown(newSocket, STOP_RECEIVING);
   	delete their_addr;
   	cerr << "setting nonblock failed, connection closed" << endl;
+  	return NULL;
   }
   newConnection->socket = newSocket;
   newConnection->addr = (addrinfo*) their_addr;
 
-  // Fork.
-  pthread_create(&threadId, NULL, connectionHandler, (void*) newConnection);
-  newlyAccepted[threadId] = newConnection;
+  return newConnection;
 
 }
 

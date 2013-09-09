@@ -11,7 +11,6 @@
 #define SERVER_H
 #include <stdexcept>
 #include <string>
-#include <map>
 #include <netdb.h>
 
 #include "Connection.h"
@@ -28,7 +27,7 @@ class Server {
   public:
     Server(const char* port = DEFAULT_PORT);
     ~Server();
-    void acceptNew();
+    Connection *acceptNew();
 
     static const int BACKLOG = 4;
     static const int ERROR = -1;
@@ -39,7 +38,6 @@ class Server {
 
     int s;
     const char* port;
-    std::map<pthread_t, Connection *> newlyAccepted;
 };
 
 #endif

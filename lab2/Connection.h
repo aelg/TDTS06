@@ -23,6 +23,10 @@ public:
 	Connection& operator=(const Connection &rhs);
 	~Connection();
 
+	void send(const std::string *data);
+	std::string *recv(char term);
+	std::string *recv(int len);
+
 	int socket;
 	addrinfo *addr;
 	char *rBuff;

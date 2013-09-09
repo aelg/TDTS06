@@ -5,6 +5,7 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <cstring>
+#include <map>
 
 #include "Server.h"
 #include "proxy.h"
@@ -35,8 +36,15 @@ Content-Type: text/html; charset=ASCII\r\n\
 
 int main(){
 	Server server("8080");
+	Connection *newConnection;
+	pthread_t threadId;
+	map<pthread_t, Connection *> newlyAccepted;
 
 	for(int i = 0; i < 10; ++i){
-		server.acceptNew();
+		newConnection = server.acceptNew();
+
+		// Fork.
+		pthread_create(&threadId, NULL, connectionHandler, (void*) newConnection);
+		newlyAccepted[threadId] = newConnection;
 	}
 }
