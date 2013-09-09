@@ -16,7 +16,6 @@
 #include "Connection.h"
 
 extern const char* DEFAULT_PORT;
-extern const int STOP_RECEIVING;
 
 class ServerException : public std::logic_error {
  public:

@@ -15,7 +15,9 @@
 
 using namespace std;
 
-const int BUFFLENGTH = 10;
+const int BUFFLENGTH = 1000;
+const int STOP_RECEIVING = 0;
+
 
 Connection::Connection(int socket, addrinfo *addr) : socket(socket), addr(addr),
 		rBuff(new char[BUFFLENGTH]), rBuffPos(0), rBuffLength(0), sBuff(new char[BUFFLENGTH]){}
@@ -42,6 +44,7 @@ Connection& Connection::operator=(const Connection &rhs){
 Connection::~Connection(){
 	delete[] rBuff;
 	delete[] sBuff;
+	shutdown(socket, STOP_RECEIVING);
 	//if(addr) delete addr;
 }
 

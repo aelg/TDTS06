@@ -9,7 +9,6 @@
 #include <string>
 
 #include "Server.h"
-#include "proxy.h"
 
 using namespace std;
 
@@ -33,7 +32,6 @@ Content-Type: text/html; charset=ASCII\r\n\
 	}
 	delete r;
 	browserConnection->sendString(s);
-	shutdown(browserConnection->socket, STOP_RECEIVING);
 
 	delete browserConnection;
 	return NULL;
