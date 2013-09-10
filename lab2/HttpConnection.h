@@ -16,16 +16,28 @@
 
 typedef std::pair<std::string, std::string> HeaderField;
 
+class HttpConnectionException : public std::logic_error {
+ public:
+  explicit HttpConnectionException(const std::string& what) throw() :
+  	logic_error(what) {};
+};
+
 class HttpConnection: private Connection {
 public:
 	HttpConnection(const Connection &conn);
 	virtual ~HttpConnection();
 
-	void setStatusLine(std::string *s);
+	static HeaderField *newHeaderField(const std::string &name, const std::string &value);
+
+	void setStatusLine(std::string *&s);
+	void setStatusLine(std::string *&&s);
 	void sendStatusLine();
-	void addHeaderField(HeaderField *header);
+	void addHeaderField(HeaderField *&header);
+	void addHeaderField(const std::string &name, const std::string &value);
+	void addContentLength();
 	void sendHeader();
-	void addData(std::string *s);
+	void addData(std::string *&s);
+	void addData(std::string *&&s);
 	void sendData();
 
 	HeaderField *getHeaderField();
@@ -33,10 +45,12 @@ public:
 	std::string *getData();
 
 private:
-	std::string *rStausLine;
+	std::string *rStatusLine;
 	std::queue<HeaderField*> rHeader;
-	std::queue<std::string*> rData;
+	std::string *rData;
 	std::string *sStatusLine;
+	std::queue<HeaderField*> sHeader;
+	std::string *sData;
 };
 
 #endif /* HTTPCONNECTION_H_ */

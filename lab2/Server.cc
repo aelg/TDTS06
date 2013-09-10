@@ -99,18 +99,18 @@ Server::~Server(){
 
 Connection *Server::acceptNew(){
   
-  struct sockaddr_storage *their_addr;
+  struct sockaddr their_addr;
   socklen_t addr_size;
   int newSocket = 0;
 
-  their_addr = new sockaddr_storage;
+  //their_addr = new sockaddr;
   addr_size = sizeof their_addr;
-  if((newSocket = accept(s, (sockaddr*) their_addr, &addr_size)) == -1){
+  if((newSocket = accept(s, &their_addr, &addr_size)) == -1){
   	throw(ServerException(string("accept failed") + string(gai_strerror(newSocket))));
   }
 
   cout << "New connection." << endl;
 
-  return new Connection(newSocket, (addrinfo*)their_addr);
+  return new Connection(newSocket, their_addr);
 
 }

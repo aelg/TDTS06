@@ -19,7 +19,7 @@ const int BUFFLENGTH = 1000; /* Internal buffer length used in recv and send. */
 const int STOP_RECEIVING = 0; /* Flag for shutdown. */
 
 
-Connection::Connection(int socket, addrinfo *addr) : socket(socket), addr(addr),
+Connection::Connection(int socket, sockaddr &addr) : socket(socket), addr(addr),
 		rBuff(new char[BUFFLENGTH]), rBuffPos(0), rBuffLength(0),
 		sBuff(new char[BUFFLENGTH]), connected(true){}
 
@@ -47,7 +47,6 @@ Connection::~Connection(){
 	delete[] rBuff;
 	delete[] sBuff;
 	shutdown(socket, STOP_RECEIVING);
-	//if(addr) delete addr;
 }
 
 /**
@@ -57,7 +56,7 @@ Connection::~Connection(){
  *
  * Note: The string will be deleted, when finished.
  */
-void Connection::sendString(const std::string *data){
+void Connection::sendString(std::string *&data){
 	int len = data->length();
 	int pos = 0;
 	while(len > 0){
@@ -74,6 +73,7 @@ void Connection::sendString(const std::string *data){
 		}
 	}
 	delete data;
+	data = nullptr;
 }
 
 /**

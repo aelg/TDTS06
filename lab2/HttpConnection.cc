@@ -5,14 +5,84 @@
  *  7 sep 2013
  */
 
+#include <sstream>
+
 #include "HttpConnection.h"
 
-HttpConnection::HttpConnection(const Connection &conn) : Connection(conn) {
-	// TODO Auto-generated constructor stub
+using namespace std;
 
-}
+HttpConnection::HttpConnection(const Connection &conn) : Connection(conn), rStatusLine(0),
+	rHeader(), rData(0), sStatusLine(0), sHeader(), sData(0){}
 
 HttpConnection::~HttpConnection() {
-	// TODO Auto-generated destructor stub
+	if(rStatusLine) delete rStatusLine;
+	if(sStatusLine) delete sStatusLine;
+	if(rData) delete rData;
+	if(sData) delete sData;
+	while(!rHeader.empty()){
+		delete rHeader.front();
+		rHeader.pop();
+	}
+	while(!sHeader.empty()){
+		delete sHeader.front();
+		sHeader.pop();
+	}
 }
 
+HeaderField *HttpConnection::newHeaderField(const std::string &name, const std::string &value){
+	return new HeaderField(name, value);
+}
+
+void HttpConnection::setStatusLine(std::string *&s){
+	sStatusLine = s;
+	s = nullptr;
+}
+void HttpConnection::setStatusLine(std::string *&&s){
+	sStatusLine = s;
+}
+void HttpConnection::sendStatusLine(){
+	sStatusLine->append("\r\n");
+	sendString(sStatusLine);
+	sStatusLine = nullptr;
+}
+void HttpConnection::addHeaderField(HeaderField *&header){
+	sHeader.push(header);
+	header = nullptr;
+}
+void HttpConnection::addHeaderField(const std::string &name, const std::string &value){
+	sHeader.push(newHeaderField(name, value));
+}
+void HttpConnection::addContentLength(){
+	stringstream ss;
+	if(!sData) throw HttpConnectionException("addContentLength called with no added data.");
+	ss << sData->length();
+	addHeaderField("Content-Length", ss.str());
+}
+void HttpConnection::sendHeader(){
+	string *s = new string();
+	while(!sHeader.empty()){
+		s->append(sHeader.front()->first);
+		s->append(": ");
+		s->append(sHeader.front()->second);
+		s->append("\r\n");
+		delete sHeader.front();
+		sHeader.pop();
+	}
+	s->append("\r\n");
+	sendString(s);
+}
+void HttpConnection::addData(std::string *&s){
+	sData = s;
+	s = nullptr;
+}
+void HttpConnection::addData(std::string *&&s){
+	sData = s;
+}
+void HttpConnection::sendData(){
+	sendString(sData);
+	sData = nullptr;
+}
+
+HeaderField *HttpConnection::getHeaderField(){return nullptr;}
+std::string *HttpConnection::getStatusLine(){return nullptr;}
+std::string *HttpConnection::getData(){return nullptr;}

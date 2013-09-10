@@ -1,6 +1,6 @@
 
-CFLAGS=-c -Wall -Wextra -pedantic -O2 -I../
-LDFLAGS = -lpthread
+CFLAGS = -c -std=c++11 -Wall -Wextra -pedantic -O2 -I../
+LDFLAGS = -lpthread -std=c++11
 
 COMPILER=g++
 
@@ -24,6 +24,6 @@ Connection.o: ../Connection.cc ../Connection.h
 HttpConnection.o: ../HttpConnection.cc ../HttpConnection.h ../Connection.h
 	$(CCC) ../HttpConnection.cc
 
-proxy.o: ../proxy.cc ../Server.h
+proxy.o: ../proxy.cc ../Server.h ../Connection.h ../HttpConnection.h
 	$(CCC) ../proxy.cc	
 	

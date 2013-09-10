@@ -25,12 +25,12 @@ class ConnectionException : public std::logic_error {
 
 class Connection{
 public:
-	Connection(int socket, addrinfo *addr);
+	Connection(int socket, sockaddr &addr);
 	Connection(const Connection &old);
 	Connection& operator=(const Connection &rhs);
 	~Connection();
 
-	void sendString(const std::string *data);
+	void sendString(std::string *&data);
 	std::string *recvTerminatedString(char term);
 	std::string *recvString(size_t len);
 
@@ -42,7 +42,7 @@ private:
 	char *getRBuff();
 
 	int socket;
-	addrinfo *addr;
+	sockaddr addr;
 	char *rBuff;
 	size_t rBuffPos;
 	size_t rBuffLength;

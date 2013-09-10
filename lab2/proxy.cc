@@ -9,20 +9,24 @@
 #include <string>
 
 #include "Server.h"
+#include "Connection.h"
+#include "HttpConnection.h"
 
 using namespace std;
 
 void *connectionHandler(void *args){
 	Connection *browserConnection;
 	string *r;
-	string *s = new string("HTTP/1.1 200 OK\r\n\
-Content-Length: 36\r\n\
-Connection: Close\r\n\
-Content-Type: text/html; charset=ASCII\r\n\
-\r\n\
-<html><body>OHOHOHO!</body></html>\r\n");
 
 	browserConnection = (Connection*) args;
+
+	HttpConnection *browserHttpConnection = new HttpConnection(*browserConnection);
+
+	browserHttpConnection->setStatusLine(new string("HTTP/1.1 200 OK"));
+	browserHttpConnection->addHeaderField("Connection", "Close");
+	browserHttpConnection->addHeaderField("Content-Type", "text/html; charset=ASCII");
+	browserHttpConnection->addData(new string("<html><body>OHOHOHO!</body></html>\r\n"));
+	browserHttpConnection->addContentLength();
 
 	for(;;){
 		r = browserConnection->recvTerminatedString('\n');
@@ -31,9 +35,12 @@ Content-Type: text/html; charset=ASCII\r\n\
 		else delete r;
 	}
 	delete r;
-	browserConnection->sendString(s);
+	browserHttpConnection->sendStatusLine();
+	browserHttpConnection->sendHeader();
+	browserHttpConnection->sendData();
 
 	delete browserConnection;
+	delete browserHttpConnection;
 	return NULL;
 }
 
