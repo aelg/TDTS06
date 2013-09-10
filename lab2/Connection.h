@@ -17,7 +17,10 @@
 
 class ConnectionException : public std::logic_error {
  public:
-  explicit ConnectionException(const std::string& what)throw() :logic_error(what) {};
+  explicit ConnectionException(const std::string& what, int error) throw() :
+  	logic_error(what), error_number(error) {};
+
+  int error_number;
 };
 
 class Connection{
@@ -31,6 +34,8 @@ public:
 	std::string *recvTerminatedString(char term);
 	std::string *recvString(size_t len);
 
+	bool isGood();
+
 private:
 	void appendRBuff(std::string *s, size_t len);
 	void updateRBuff();
@@ -42,6 +47,7 @@ private:
 	size_t rBuffPos;
 	size_t rBuffLength;
 	char *sBuff;
+	bool connected;
 };
 
 #endif /* CONNECTION_H_ */

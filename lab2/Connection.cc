@@ -15,15 +15,17 @@
 
 using namespace std;
 
-const int BUFFLENGTH = 1000;
-const int STOP_RECEIVING = 0;
+const int BUFFLENGTH = 1000; /* Internal buffer length used in recv and send. */
+const int STOP_RECEIVING = 0; /* Flag for shutdown. */
 
 
 Connection::Connection(int socket, addrinfo *addr) : socket(socket), addr(addr),
-		rBuff(new char[BUFFLENGTH]), rBuffPos(0), rBuffLength(0), sBuff(new char[BUFFLENGTH]){}
+		rBuff(new char[BUFFLENGTH]), rBuffPos(0), rBuffLength(0),
+		sBuff(new char[BUFFLENGTH]), connected(true){}
 
 Connection::Connection(const Connection &old): socket(old.socket), addr(old.addr),
-		rBuff(new char[BUFFLENGTH]), rBuffPos(0), rBuffLength(0), sBuff(new char[BUFFLENGTH]){
+		rBuff(new char[BUFFLENGTH]), rBuffPos(0), rBuffLength(0), sBuff(new char[BUFFLENGTH]),
+		connected(true){
 	for(int i = 0; i < BUFFLENGTH; ++i){
 		rBuff[i] = old.rBuff[i];
 		sBuff[i] = old.sBuff[i];
@@ -75,7 +77,7 @@ void Connection::sendString(const std::string *data){
 }
 
 /**
- * Receives data until the terminating byte term is found.
+ * Receives data until the terminating byte term is found or the connection is closed.
  * Parameter:
  * char term 		Terminating character.
  *
@@ -89,7 +91,12 @@ string *Connection::recvTerminatedString(char term){
 	char *hit;
 	for(;;){
 		if(rBuffLength == 0){
-			updateRBuff();
+			if(connected){
+				updateRBuff();
+			}
+			else{
+				break;
+			}
 		}
 		hit = reinterpret_cast<char*>(memchr(reinterpret_cast<void*>(getRBuff()), term, rBuffLength));
 		if(hit){
@@ -104,12 +111,12 @@ string *Connection::recvTerminatedString(char term){
 }
 
 /**
- * Receives len bytes of data.
+ * Receives len bytes of data or all data received before the connection is closed.
  * Parameter:
  * size_t len 		Length of returned string.
  *
  * Return value:
- * A string pointer, the string will be len characters long.
+ * A string pointer, the string will be at most len characters long.
  *
  * Note: The returned string must be deleted.
  */
@@ -117,7 +124,10 @@ string *Connection::recvString(size_t len){
 	string *s = new string();
 	for(;len > 0;){
 		if(rBuffLength == 0){
-			updateRBuff();
+			if(connected){
+				updateRBuff();
+			}
+			else break;
 		}
 		if(rBuffLength >= len){
 			appendRBuff(s, len);
@@ -133,12 +143,19 @@ string *Connection::recvString(size_t len){
 }
 
 /**
+ * Is the connection good.
+ */
+bool Connection::isGood(){
+	return connected;
+}
+
+/**
  * Appends len bytes from rBuff to the string pointed to by s.
  * If len is larger than data currently in rBuff an ConnectionException is thrown.
  */
 void Connection::appendRBuff(string *s, size_t len){
 	if(rBuffLength < len){
-		throw ConnectionException("Read outside rBuff.");
+		throw ConnectionException("Read outside rBuff.", 0);
 	}
 	s->append(rBuff, rBuffPos, len);
 	rBuffPos += len;
@@ -151,13 +168,21 @@ void Connection::appendRBuff(string *s, size_t len){
  */
 void Connection::updateRBuff(){
 	if(rBuffLength > 0){
-		throw ConnectionException("Update of rBuff when it's not empty.");
+		throw ConnectionException("Update of rBuff when it's not empty.", 0);
 	}
-	ssize_t len;
+	int len;
 	errno = 0;
 	len = recv(socket, rBuff, BUFFLENGTH, 0);
 	if(len == -1){
-		throw ConnectionException(string("updateRBuff, recv() failed: ") + string(strerror(errno)));
+		if (errno == ECONNRESET || errno == ETIMEDOUT){
+			connected = false;
+		}
+		else{
+			throw ConnectionException(string("updateRBuff, recv() failed: ") + string(strerror(errno)), errno);
+		}
+	}
+	if(len == 0){
+		connected = false;
 	}
 	rBuffPos = 0;
 	rBuffLength = len;
