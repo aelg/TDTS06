@@ -22,11 +22,13 @@ class ServerException : public std::logic_error {
   explicit ServerException(const std::string& what, int errorNumber)throw():
   	logic_error(what), errorNumber(errorNumber){};
   int errorNumber;
-  static const int ACCEPT_FAILED = 1;
-  static const int ACCEPT_INTERRUPTED = 2;
-  static const int GETADDRINFO_FAILED = 3;
-  static const int BIND_FAILED = 4;
-  static const int LISTEN_FAILED = 5;
+  enum{
+  	ACCEPT_FAILED = 1,
+  	ACCEPT_INTERRUPTED,
+  	GETADDRINFO_FAILED,
+  	BIND_FAILED,
+  	LISTEN_FAILED
+  };
 };
 
 class Server {
