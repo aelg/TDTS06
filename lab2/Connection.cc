@@ -69,10 +69,12 @@ void Connection::sendString(std::string *&data){
 			if(send(socket, sBuff, BUFFLENGTH, 0) == -1){
 				if(errno == EPIPE){
 					connected = false;
-					throw ConnectionException(string("send failed: Broken Pipe") + string(strerror(errno)), 0);
+					throw ConnectionException(string("send failed: Broken Pipe") + string(strerror(errno)),
+																		ConnectionException::BROKEN_PIPE);
 				}
 				else{
-					throw ConnectionException(string("send failed") + string(strerror(errno)), 0);
+					throw ConnectionException(string("send failed") + string(strerror(errno)),
+																		ConnectionException::SEND_ERROR);
 				}
 			}
 			pos += BUFFLENGTH;
@@ -167,7 +169,7 @@ bool Connection::isGood(){
  */
 void Connection::appendRBuff(string *s, size_t len){
 	if(rBuffLength < len){
-		throw ConnectionException("Read outside rBuff.", 0);
+		throw ConnectionException("Read outside rBuff.", ConnectionException::READ_OUTSIDE_RBUFF);
 	}
 	s->append(rBuff, rBuffPos, len);
 	rBuffPos += len;
@@ -180,7 +182,8 @@ void Connection::appendRBuff(string *s, size_t len){
  */
 void Connection::updateRBuff(){
 	if(rBuffLength > 0){
-		throw ConnectionException("Update of rBuff when it's not empty.", 0);
+		throw ConnectionException("Update of rBuff when it's not empty.",
+															ConnectionException::RBUFF_NOT_EMPTY);
 	}
 	int len;
 	errno = 0;
@@ -190,7 +193,10 @@ void Connection::updateRBuff(){
 			connected = false;
 		}
 		else{
-			throw ConnectionException(string("updateRBuff, recv() failed: ") + string(strerror(errno)), errno);
+			throw ConnectionException(
+						string("updateRBuff, recv() failed: ") +
+						string(strerror(errno)),
+						ConnectionException::RECEIVE_ERROR);
 		}
 	}
 	if(len == 0){

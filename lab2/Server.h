@@ -19,16 +19,17 @@ extern const char* DEFAULT_PORT;
 
 class ServerException : public std::logic_error {
  public:
-  explicit ServerException(const std::string& what, int errorNumber)throw():
+	enum Error{
+		ACCEPT_FAILED = 1,
+		ACCEPT_INTERRUPTED,
+		GETADDRINFO_FAILED,
+		BIND_FAILED,
+		LISTEN_FAILED
+	};
+  explicit ServerException(const std::string& what, Error errorNumber)throw():
   	logic_error(what), errorNumber(errorNumber){};
   int errorNumber;
-  enum{
-  	ACCEPT_FAILED = 1,
-  	ACCEPT_INTERRUPTED,
-  	GETADDRINFO_FAILED,
-  	BIND_FAILED,
-  	LISTEN_FAILED
-  };
+
 };
 
 class Server {

@@ -17,13 +17,18 @@
 
 class ConnectionException : public std::logic_error {
  public:
-  explicit ConnectionException(const std::string& what, int error) throw() :
+	enum Error{
+		NOT_CONNECTED = 1,
+		RECEIVE_ERROR,
+		READ_OUTSIDE_RBUFF,
+		RBUFF_NOT_EMPTY,
+		SEND_ERROR,
+		BROKEN_PIPE
+	};
+  explicit ConnectionException(const std::string& what, Error error) throw() :
   	logic_error(what), error_number(error) {};
 
-  int error_number;
-  enum {
-  	NOT_CONNECTED = 1
-  };
+  Error error_number;
 };
 
 class Connection{
