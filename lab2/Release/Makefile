@@ -5,7 +5,7 @@ LDFLAGS = -lpthread -std=c++11
 COMPILER=g++
 
 CCC=$(COMPILER) $(CFLAGS)
-LDC=$(COMPILER) $(LDFLAGS)
+LDC=$(COMPILER)
 
 all: proxy
 	
@@ -13,7 +13,7 @@ clean:
 	rm -rf *.o proxy
 	
 proxy: Server.o proxy.o Connection.o HttpConnection.o ../Server.h
-	$(LDC) -o proxy Server.o proxy.o Connection.o HttpConnection.o
+	$(LDC) -o proxy Server.o proxy.o Connection.o HttpConnection.o $(LDFLAGS)
 
 Server.o: ../Server.cc ../Server.h ../Connection.h
 	$(CCC) ../Server.cc

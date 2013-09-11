@@ -31,13 +31,15 @@ public:
 
 	void setStatusLine(std::string *&s);
 	void setStatusLine(std::string *&&s);
-	void sendStatusLine();
 	void addHeaderField(HeaderField *&header);
 	void addHeaderField(const std::string &name, const std::string &value);
-	void addContentLength();
-	void sendHeader();
 	void addData(std::string *&s);
 	void addData(std::string *&&s);
+
+	void addContentLength();
+
+	void sendStatusLine();
+	void sendHeader();
 	void sendData();
 
 	HeaderField *getHeaderField();
