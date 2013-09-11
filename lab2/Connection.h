@@ -21,6 +21,7 @@ class ConnectionException : public std::logic_error {
   	logic_error(what), error_number(error) {};
 
   int error_number;
+  static int const NOT_CONNECTED = 1;
 };
 
 class Connection{

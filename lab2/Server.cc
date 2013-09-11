@@ -51,7 +51,8 @@ Server::Server(const char* port) : port(port){
 
   // Get addrinfo
   if((status = getaddrinfo(NULL, port, &hints, &servinfo)) != 0){
-    throw(ServerException(string("getaddrinfo failed") + string(gai_strerror(status))));
+    throw(ServerException(string("getaddrinfo failed") + string(gai_strerror(status)),
+    											ServerException::GETADDRINFO_FAILED));
   }
 
   // Find a working socket.
@@ -83,11 +84,11 @@ Server::Server(const char* port) : port(port){
 
   // Test if socket was found.
   if (p == 0)
-    throw(ServerException("failed to bind!"));
+    throw(ServerException("failed to bind!", ServerException::BIND_FAILED));
 
   // Listen to socket.
   if (listen(s, BACKLOG) == -1)
-    throw(ServerException("listen failed"));
+    throw(ServerException("listen failed", ServerException::LISTEN_FAILED));
 
   // Server is ready to accept connections.
   cout << "Waiting for connections." << endl;
@@ -106,11 +107,22 @@ Connection *Server::acceptNew(){
   //their_addr = new sockaddr;
   addr_size = sizeof their_addr;
   if((newSocket = accept(s, &their_addr, &addr_size)) == -1){
-  	throw(ServerException(string("accept failed") + string(gai_strerror(newSocket))));
+  	if(errno == EINTR){
+  		throw(ServerException(string("accept failed: ") + string(strerror(errno)),
+  		  										ServerException::ACCEPT_INTERRUPTED));
+  	}
+  	else{
+  		throw(ServerException(string("accept failed: ") + string(strerror(errno)),
+  												  ServerException::ACCEPT_FAILED));
+  	}
   }
 
   cout << "New connection." << endl;
 
   return new Connection(newSocket, their_addr);
 
+}
+
+void Server::stopListening(){
+	shutdown(s, STOP_RECEIVING);
 }

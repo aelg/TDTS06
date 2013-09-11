@@ -19,7 +19,14 @@ extern const char* DEFAULT_PORT;
 
 class ServerException : public std::logic_error {
  public:
-  explicit ServerException(const std::string& what)throw() :logic_error(what) {};
+  explicit ServerException(const std::string& what, int errorNumber)throw():
+  	logic_error(what), errorNumber(errorNumber){};
+  int errorNumber;
+  static const int ACCEPT_FAILED = 1;
+  static const int ACCEPT_INTERRUPTED = 2;
+  static const int GETADDRINFO_FAILED = 3;
+  static const int BIND_FAILED = 4;
+  static const int LISTEN_FAILED = 5;
 };
 
 class Server {
@@ -27,6 +34,7 @@ class Server {
     Server(const char* port = DEFAULT_PORT);
     ~Server();
     Connection *acceptNew();
+    void stopListening();
 
     static const int BACKLOG = 4;
     static const int ERROR = -1;

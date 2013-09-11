@@ -57,12 +57,24 @@ Connection::~Connection(){
  * Note: The string will be deleted, when finished.
  */
 void Connection::sendString(std::string *&data){
+	if(!connected){
+		throw ConnectionException(string("sendString called while not connected."),
+				ConnectionException::NOT_CONNECTED);
+	}
 	int len = data->length();
 	int pos = 0;
 	while(len > 0){
 		if (len > BUFFLENGTH){
 			memcpy(sBuff, data->c_str()+pos, BUFFLENGTH);
-			send(socket, sBuff, BUFFLENGTH, 0);
+			if(send(socket, sBuff, BUFFLENGTH, 0) == -1){
+				if(errno == EPIPE){
+					connected = false;
+					throw ConnectionException(string("send failed: Broken Pipe") + string(strerror(errno)), 0);
+				}
+				else{
+					throw ConnectionException(string("send failed") + string(strerror(errno)), 0);
+				}
+			}
 			pos += BUFFLENGTH;
 			len -= BUFFLENGTH;
 		}
