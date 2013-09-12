@@ -1,6 +1,6 @@
 
-CFLAGS = -c -g -std=c++11 -Wall -Wextra -pedantic -I../
-LDFLAGS = -g -std=c++11
+CFLAGS = -c -g -std=gnu++0x -Wall -Wextra -pedantic -I../
+LDFLAGS = -g -std=gnu++0x
 
 COMPILER=g++
 
