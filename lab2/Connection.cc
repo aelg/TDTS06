@@ -18,6 +18,9 @@ using namespace std;
 const int BUFFLENGTH = 1000; /* Internal buffer length used in recv and send. */
 const int STOP_RECEIVING = 0; /* Flag for shutdown. */
 
+Connection::Connection() : socket(0), addr(),
+		rBuff(new char[BUFFLENGTH]), rBuffPos(0), rBuffLength(0),
+		sBuff(new char[BUFFLENGTH]), connected(true){}
 
 Connection::Connection(int socket, sockaddr &addr) : socket(socket), addr(addr),
 		rBuff(new char[BUFFLENGTH]), rBuffPos(0), rBuffLength(0),
