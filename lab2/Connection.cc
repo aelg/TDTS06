@@ -49,7 +49,11 @@ Connection& Connection::operator=(const Connection &rhs){
 Connection::~Connection(){
 	delete[] rBuff;
 	delete[] sBuff;
-	shutdown(socket, STOP_RECEIVING);
+}
+
+void Connection::setConnection(Connection &conn){
+	socket = conn.socket;
+	addr = conn.addr;
 }
 
 /**

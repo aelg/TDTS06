@@ -13,6 +13,7 @@
 #include <utility>
 
 #include "Connection.h"
+#include "ci_string.h"
 
 typedef std::pair<std::string, std::string> HeaderField;
 
@@ -26,6 +27,8 @@ class HttpConnection: private Connection {
 public:
 	HttpConnection(const Connection &conn);
 	virtual ~HttpConnection();
+
+	void setConnection(Connection &conn);
 
 	static HeaderField *newHeaderField(const std::string &name, const std::string &value);
 

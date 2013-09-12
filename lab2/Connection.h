@@ -38,6 +38,7 @@ public:
 	Connection(const Connection &old);
 	Connection& operator=(const Connection &rhs);
 	~Connection();
+	void setConnection(Connection &conn);
 
 	void sendString(std::string *&data);
 	std::string *recvTerminatedString(char term);

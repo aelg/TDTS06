@@ -29,8 +29,12 @@ HttpConnection::~HttpConnection() {
 	}
 }
 
-HeaderField *HttpConnection::newHeaderField(const std::string &name, const std::string &value){
-	return new HeaderField(name, value);
+void HttpConnection::setConnection(Connection &conn){
+	Connection::setConnection(conn);
+}
+
+HeaderField *HttpConnection::newHeaderField(const string &name, const string &value){
+	return new HeaderField(string(name), string(value));
 }
 
 void HttpConnection::setStatusLine(std::string *&s){
@@ -49,14 +53,14 @@ void HttpConnection::addHeaderField(HeaderField *&header){
 	sHeader.push(header);
 	header = nullptr;
 }
-void HttpConnection::addHeaderField(const std::string &name, const std::string &value){
+void HttpConnection::addHeaderField(const string &name, const string &value){
 	sHeader.push(newHeaderField(name, value));
 }
 void HttpConnection::addContentLength(){
 	stringstream ss;
 	if(!sData) throw HttpConnectionException("addContentLength called with no added data.");
 	ss << sData->length();
-	addHeaderField("Content-Length", ss.str());
+	addHeaderField("Content-Length", string(ss.str()));
 }
 void HttpConnection::sendHeader(){
 	string *s = new string();

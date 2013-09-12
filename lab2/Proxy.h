@@ -19,6 +19,7 @@ class ProxyException : public std::logic_error {
 	enum Error{
 		UNKNOWN_ERROR,
 		HOST_HEADER_NOT_FOUND,
+		SETUP_SERVER_CONNECTION_ERROR
 	};
   explicit ProxyException(const std::string& what, Error error) throw() :
   	logic_error(what), error_number(error) {};
@@ -40,8 +41,10 @@ private:
 	void setupServerConnection();
 	void sendBrowserRequest();
 	void readServerResponse();
-	bool transferServerResponse();
-	void sendServerResponse();
+	void transferServerResponseHeader();
+	void sendServerResponseHeader();
+	bool transferServerResponseData();
+	void sendServerResponseData();
 	void closeServerConnection();
 
 	void filterHeaderFieldOut(HeaderField* h);
@@ -51,6 +54,7 @@ private:
 	HttpConnection *server;
 
 	std::string serverHostname;
+	int contentLength;
 
 };
 
