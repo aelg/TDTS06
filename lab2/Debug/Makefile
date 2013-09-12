@@ -25,6 +25,9 @@ Connection.o: ../Connection.cc ../Connection.h
 	
 HttpConnection.o: ../HttpConnection.cc ../HttpConnection.h ../Connection.h
 	$(CCC) ../HttpConnection.cc
+	
+Proxy.o: ../Proxy.cc ../Proxy.h ../HttpConnection.h
+	$(CCC) ../Proxy.cc
 
 main.o: ../main.cc ../Server.h ../Connection.h ../HttpConnection.h
 	$(CCC) ../main.cc	

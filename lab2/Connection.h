@@ -33,6 +33,7 @@ class ConnectionException : public std::logic_error {
 
 class Connection{
 public:
+	Connection();
 	Connection(int socket, sockaddr &addr);
 	Connection(const Connection &old);
 	Connection& operator=(const Connection &rhs);
