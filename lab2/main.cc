@@ -19,7 +19,7 @@ int doExit = false;
 
 void *connectionHandler(void *args){
 	Connection *browserConnection;
-	string *r;
+	string *r = 0;
 
 	browserConnection = (Connection*) args;
 
