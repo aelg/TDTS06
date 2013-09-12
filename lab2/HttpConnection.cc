@@ -8,11 +8,12 @@
 #include <sstream>
 
 #include "HttpConnection.h"
+#include <iostream>
 
 using namespace std;
 
 HttpConnection::HttpConnection(const Connection &conn) : Connection(conn), rStatusLine(0),
-	rHeader(), rData(0), sStatusLine(0), sHeader(), sData(0){}
+		rHeader(), rData(0), sStatusLine(0), sHeader(), sData(0){}
 
 HttpConnection::~HttpConnection() {
 	if(rStatusLine) delete rStatusLine;
@@ -88,5 +89,43 @@ void HttpConnection::sendData(){
 }
 
 HeaderField *HttpConnection::getHeaderField(){return nullptr;}
-std::string *HttpConnection::getStatusLine(){return nullptr;}
-std::string *HttpConnection::getData(){return nullptr;}
+std::string* HttpConnection::getStatusLine(){
+	return rStatusLine;
+}
+string* HttpConnection::getData(){
+	return rData;
+}
+void HttpConnection::recvStatusLine(){
+	rStatusLine = recvTerminatedString('\n');
+	if(rStatusLine->find("GET")== string::npos){
+		delete rStatusLine;
+		rStatusLine = new string("");
+		throw HttpConnectionException("Not a valid HTTP GET request");
+	}
+}
+
+
+void HttpConnection::recvHeader(){
+	string *headerLine;
+	for (;;){
+		headerLine = recvTerminatedString('\n');
+		if (*headerLine == "\r\n")
+			break;
+		size_t posColon = headerLine->find_first_of(':', 0);
+		size_t posFirstChar = headerLine->find_first_not_of(' ');
+		size_t posNewLine = headerLine->find_first_of('\r');
+		if (posColon == string::npos || posFirstChar == string::npos || posNewLine == string::npos )
+			throw HttpConnectionException("Empty string or string not containing header");
+		HeaderField *currentHeader = new HeaderField(
+				string(*headerLine,posFirstChar, posColon-posFirstChar),
+				string(*headerLine,posColon + 1, posNewLine - posColon));
+		rHeader.push(currentHeader);
+		delete headerLine;
+	}
+}
+
+void HttpConnection::recvData(){
+	rData = recvTerminatedString('\n');
+}
+
+

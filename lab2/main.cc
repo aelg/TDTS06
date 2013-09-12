@@ -19,7 +19,6 @@ int doExit = false;
 
 void *connectionHandler(void *args){
 	Connection *browserConnection;
-	string *r = 0;
 
 	browserConnection = (Connection*) args;
 
@@ -33,18 +32,38 @@ void *connectionHandler(void *args){
 		browserHttpConnection->addData(new string("<html><body>OHOHOHO!</body></html>\r\n"));
 		browserHttpConnection->addContentLength();
 
-		for(;browserConnection->isGood();){
-			r = browserConnection->recvTerminatedString('\n');
-			cout << *r;
-			if(*r == "\r\n") break;
-			else{
-				delete r;
-				r = nullptr;
+		if(browserConnection->isGood()){
+			try {
+			browserHttpConnection->recvStatusLine();
+			}catch (HttpConnectionException &e){
+				cerr << "Not a valid GET command" << endl;
+				cerr << browserHttpConnection->getStatusLine()->c_str() << endl;
+				break;
 			}
+
+			try{
+			browserHttpConnection->recvHeader();
+			} catch (HttpConnectionException &e){
+				cerr << "No header closing" << endl;
+				break;
+
+			}
+
+			//browserHttpConnection->recvData();
+
+			//r = browserConnection->recvTerminatedString('\n');
+			//cerr << "hej3" << endl;
 		}
-		if (r) delete r;
+		else{
+			cerr << "Connection may be closed from the other side." << endl;
+		}
+
+
+		//cerr << "hallå" << endl;
 		browserHttpConnection->sendStatusLine();
+		//cerr << "tjena" << endl;
 		browserHttpConnection->sendHeader();
+		//cerr << "voi voi" << endl;
 		browserHttpConnection->sendData();
 	}
 

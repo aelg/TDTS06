@@ -45,6 +45,11 @@ public:
 	void sendHeader();
 	void sendData();
 
+	void recvStatusLine();
+	void recvHeader();
+	void recvData();
+
+
 	HeaderField *getHeaderField();
 	std::string *getStatusLine();
 	std::string *getData();
