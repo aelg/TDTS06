@@ -14,8 +14,8 @@ all: proxy
 clean:
 	rm -rf *.o proxy
 	
-proxy: Server.o main.o Connection.o HttpConnection.o ../Server.h
-	$(LDC) -o proxy Server.o main.o Connection.o HttpConnection.o $(LIBRARIES) 
+proxy: Server.o main.o Connection.o HttpConnection.o Proxy.o ../Server.h ../Proxy.h ../Connection.h ../HttpConnection.h
+	$(LDC) -o proxy Server.o main.o Connection.o HttpConnection.o Proxy.o $(LIBRARIES) 
 
 Server.o: ../Server.cc ../Server.h ../Connection.h
 	$(CCC) ../Server.cc

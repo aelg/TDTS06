@@ -19,7 +19,9 @@ class ProxyException : public std::logic_error {
 	enum Error{
 		UNKNOWN_ERROR,
 		HOST_HEADER_NOT_FOUND,
-		SETUP_SERVER_CONNECTION_ERROR
+		SETUP_SERVER_CONNECTION_ERROR,
+		BAD_BROWSER,
+		BAD_SERVER
 	};
   explicit ProxyException(const std::string& what, Error error) throw() :
   	logic_error(what), error_number(error) {};
@@ -36,26 +38,29 @@ public:
 	void run();
 
 private:
-	void readBrowserRequest();
-	void transferBrowserRequest();
-	void setupServerConnection();
-	void sendBrowserRequest();
-	void readServerResponse();
-	void transferServerResponseHeader();
-	void sendServerResponseHeader();
+	bool readBrowserRequest();
+	bool transferBrowserRequest();
+	bool setupServerConnection();
+	bool sendBrowserRequest();
+	bool readServerResponse();
+	bool transferServerResponseHeader();
+	bool sendServerResponseHeader();
 	bool transferServerResponseData();
-	void sendServerResponseData();
+	bool sendServerResponseData();
 	void closeServerConnection();
 
-	void filterHeaderFieldOut(HeaderField* h);
-	void filterHeaderFieldIn(HeaderField* h);
+	HeaderField* filterHeaderFieldOut(HeaderField* h);
+	HeaderField* filterHeaderFieldIn(HeaderField* h);
+
+	void send501NotImplented();
 
 	HttpConnection *browser;
 	HttpConnection *server;
 
 	std::string serverHostname;
 	int contentLength;
-
+	bool transferData;
+	bool chunkedTransfer;
 };
 
 #endif /* PROXY_H_ */

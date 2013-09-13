@@ -12,6 +12,7 @@
 #include "Server.h"
 #include "Connection.h"
 #include "HttpConnection.h"
+#include "Proxy.h"
 
 using namespace std;
 
@@ -23,8 +24,13 @@ void *connectionHandler(void *args){
 	browserConnection = (Connection*) args;
 
 	HttpConnection *browserHttpConnection = new HttpConnection(*browserConnection);
+	delete browserConnection;
 
-	for(;browserConnection->isGood() && !doExit;){
+	Proxy p(browserHttpConnection);
+	p.run();
+	return nullptr;
+
+	/*for(;browserConnection->isGood() && !doExit;){
 		browserHttpConnection->setStatusLine(new string("HTTP/1.1 200 OK"));
 		browserHttpConnection->addHeaderField("Connection", "Keep-Alive");
 		browserHttpConnection->addHeaderField("Keep-Alive", "timeout=10");
@@ -69,7 +75,7 @@ void *connectionHandler(void *args){
 
 	delete browserConnection;
 	delete browserHttpConnection;
-	return NULL;
+	return NULL;*/
 }
 
 void SIGINTHandler(int){

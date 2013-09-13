@@ -10,13 +10,15 @@
 
 #include <cstring>
 #include <errno.h>
+#include <iostream>
 
 #include "Connection.h"
 
 using namespace std;
 
-const int BUFFLENGTH = 1000; /* Internal buffer length used in recv and send. */
+const int BUFFLENGTH = 4096; /* Internal buffer length used in recv and send. */
 const int STOP_RECEIVING = 0; /* Flag for shutdown. */
+const bool DEBUG = false;
 
 Connection::Connection() : socket(0), addr(),
 		rBuff(new char[BUFFLENGTH]), rBuffPos(0), rBuffLength(0),
@@ -70,10 +72,12 @@ void Connection::sendString(std::string *&data){
 	}
 	int len = data->length();
 	int pos = 0;
+	int sent;
 	while(len > 0){
 		if (len > BUFFLENGTH){
 			memcpy(sBuff, data->c_str()+pos, BUFFLENGTH);
-			if(send(socket, sBuff, BUFFLENGTH, 0) == -1){
+
+			if((sent = send(socket, sBuff, BUFFLENGTH, 0)) == -1){
 				if(errno == EPIPE){
 					connected = false;
 					throw ConnectionException(string("send failed: Broken Pipe") + string(strerror(errno)),
@@ -84,12 +88,14 @@ void Connection::sendString(std::string *&data){
 																		ConnectionException::SEND_ERROR);
 				}
 			}
+			if(DEBUG) cerr << ">>>>>>" << string(sBuff, sent) << "||" << endl;
 			pos += BUFFLENGTH;
 			len -= BUFFLENGTH;
 		}
 		else{
 			memcpy(sBuff, data->c_str()+pos, len);
-			send(socket, sBuff, len, 0);
+			sent = send(socket, sBuff, len, 0);
+			if(DEBUG) cerr << ">>>>>>" << string(sBuff, sent) << "||" << endl;
 			len = 0;
 		}
 	}
@@ -156,10 +162,11 @@ string *Connection::recvString(size_t len){
 		}
 		else if(rBuffLength > 0){
 			appendRBuff(s, rBuffLength);
-			len -= rBuffLength;
+			len = len - rBuffLength;
 		}
 		if(len == 0) break;
 	}
+	if(len != s->length()) cerr << "Differing lengths: " << len << " " << s->length() << endl;
 	return s;
 }
 
@@ -178,7 +185,7 @@ void Connection::appendRBuff(string *s, size_t len){
 	if(rBuffLength < len){
 		throw ConnectionException("Read outside rBuff.", ConnectionException::READ_OUTSIDE_RBUFF);
 	}
-	s->append(rBuff, rBuffPos, len);
+	s->append(rBuff+rBuffPos, len);
 	rBuffPos += len;
 	rBuffLength -= len;
 }
@@ -195,6 +202,7 @@ void Connection::updateRBuff(){
 	int len;
 	errno = 0;
 	len = recv(socket, rBuff, BUFFLENGTH, 0);
+	if(DEBUG) cerr << "<<<<<<" << string(rBuff, len) << "||" << len << endl;
 	if(len == -1){
 		if (errno == ECONNRESET || errno == ETIMEDOUT){
 			connected = false;

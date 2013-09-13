@@ -21,7 +21,9 @@ int const STOP_RECEIVING = 0;
 
 using namespace std;
 
-Proxy::Proxy(HttpConnection *browser) : browser(browser), server(nullptr), contentLength(0) {}
+Proxy::Proxy(HttpConnection *browser) : browser(browser), server(nullptr),
+																				contentLength(0), transferData(true),
+																				chunkedTransfer(false){}
 
 Proxy::~Proxy() {
 	if(browser) delete browser;
@@ -29,42 +31,70 @@ Proxy::~Proxy() {
 }
 
 void Proxy::run(){
-	readBrowserRequest();
-	transferBrowserRequest();
-	setupServerConnection();
-	sendBrowserRequest();
-	readServerResponse();
-	transferServerResponseHeader();
-	sendServerResponseHeader();
-	while(transferServerResponseData()){
-		sendServerResponseData();
+	for(bool b = true; b; b = false){
+		if(!readBrowserRequest()) break;
+		if(!transferBrowserRequest()) break;
+		if(!setupServerConnection()) break;
+		if(!sendBrowserRequest()) break;
+		if(!readServerResponse()) break;
+		if(!transferServerResponseHeader()) break;
+		if(!sendServerResponseHeader()) break;
+		while(transferData && transferServerResponseData()){
+			sendServerResponseData();
+		}
 	}
 	closeServerConnection();
 }
 
-void Proxy::readBrowserRequest(){
-	/*browser->recvStatusLine();
+bool Proxy::readBrowserRequest(){
+	HttpConnection::ReceivedType r;
+	try{
+		r = browser->recvStatusLine();
+	}catch(HttpConnectionException &e){
+		throw ProxyException(string("readBrowserRequest catched: ") + e.what(),
+												 ProxyException::UNKNOWN_ERROR);
+	}
 	browser->recvHeader();
-	browser->recvData();*/
+	switch(r){
+	case HttpConnection::GET_REQUEST:
+		break;
+	case HttpConnection::RESPONSE:
+		throw ProxyException("Received response from browser.", ProxyException::BAD_BROWSER);
+		break;
+	case HttpConnection::NOT_IMPLEMENTED_REQUEST:
+		send501NotImplented();
+		return false;
+	default:
+		ProxyException("This can't happen.", ProxyException::UNKNOWN_ERROR);
+		break;
+	}
+	return true;
 }
 
-void Proxy::transferBrowserRequest(){
+bool Proxy::transferBrowserRequest(){
 	string* statusLine;
 	HeaderField *h;
+	size_t httpPos;
 	serverHostname = "";
 
 	server = new HttpConnection(Connection());
 
 	statusLine = browser->getStatusLine();
+	cerr << "Status Line: " << *statusLine << endl;
+
+	if((httpPos = statusLine->find("http://")) != string::npos){
+		statusLine->erase(httpPos, statusLine->find_first_of('/', httpPos+7) - httpPos);
+	}
 	server->setStatusLine(statusLine);
 
 	while((h = browser->getHeaderField())){
-		filterHeaderFieldOut(h);
-		server->addHeaderField(h);
+		h = filterHeaderFieldOut(h);
+		if(h)server->addHeaderField(h);
 	}
+	return true;
 }
 
-void Proxy::setupServerConnection(){
+bool Proxy::setupServerConnection(){
 	if(serverHostname.empty()){
 		throw ProxyException("setupServerConnection: Host header not found.",
 				ProxyException::HOST_HEADER_NOT_FOUND);
@@ -77,6 +107,7 @@ void Proxy::setupServerConnection(){
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_STREAM;
 
+	cerr << "Connecting to: '" << serverHostname.c_str() << '\''<< endl;
 	if((rv = getaddrinfo(serverHostname.c_str(), "80", &hints, &servinfo)) != 0){
 		throw ProxyException(string("Remote server setup failed, getaddrinfo: ") + string(gai_strerror(rv)),
 				ProxyException::SETUP_SERVER_CONNECTION_ERROR);
@@ -94,58 +125,110 @@ void Proxy::setupServerConnection(){
 					 << strerror(errno);
 			continue;
 		}
+		break;
 	}
 	if(p == nullptr){
-		throw ProxyException("Remote server setup failed, failed to connect.",
+		throw ProxyException(string("Remote server setup failed, failed to connect. Last error: ") + strerror(errno),
 						ProxyException::SETUP_SERVER_CONNECTION_ERROR);
 	}
 	freeaddrinfo(servinfo);
 	addr = *reinterpret_cast<sockaddr*>(p);
 	Connection newConnection(sockfd, addr);
 	server->setConnection(newConnection);
+	return true;
 }
-void Proxy::sendBrowserRequest(){
+bool Proxy::sendBrowserRequest(){
 	server->sendStatusLine();
 	server->sendHeader();
+	return true;
 }
-void Proxy::readServerResponse(){
-	/*server->recvStatusLine();
-	server->recvHeader();*/
+bool Proxy::readServerResponse(){
+	HttpConnection::ReceivedType r;
+	r = server->recvStatusLine();
+	server->recvHeader();
+	switch(r){
+		case HttpConnection::GET_REQUEST:
+			throw ProxyException("Received GET request from server.", ProxyException::BAD_SERVER);
+			break;
+		case HttpConnection::RESPONSE:
+			if(server->getStatusCode() != 200){ //Don't know if data will be sent with other codes.
+				transferData = false;
+			}
+			else{
+				transferData = true;
+			}
+			break;
+		case HttpConnection::NOT_IMPLEMENTED_REQUEST:
+			// Shouldn't happen.
+			throw ProxyException("Received unimplemented request from server.", ProxyException::BAD_SERVER);
+			return true;
+		default:
+			ProxyException("This can't happen.", ProxyException::UNKNOWN_ERROR);
+			break;
+		}
+	return true;
 }
-void Proxy::transferServerResponseHeader(){
+bool Proxy::transferServerResponseHeader(){
+	cerr << "transferServerResponseHeader" << endl;
 	string *statusLine;
 	HeaderField *h;
 	contentLength = 0;
+	chunkedTransfer = false;
 
 	statusLine = server->getStatusLine();
 	browser->setStatusLine(statusLine);
 
 	while((h = server->getHeaderField())){
-		filterHeaderFieldIn(h);
+		h = filterHeaderFieldIn(h);
+		if(h)browser->addHeaderField(h);
 	}
+	return true;
 }
 
-void Proxy::sendServerResponseHeader(){
-	server->sendStatusLine();
-	server->sendHeader();
+bool Proxy::sendServerResponseHeader(){
+	cerr << "sendServerResponseHeader()" << endl;
+	cerr << "transferData: " << transferData << endl;
+	browser->sendStatusLine();
+	browser->sendHeader();
+	return true;
 }
 
 bool Proxy::transferServerResponseData(){
-	if(contentLength == 0) return false;
+	cerr << "transferServerResponseData()" << endl;
+	cerr << "Content-Length: " << contentLength << endl;
 	string* data;
-	server->getData();
+	bool moreData = true;
+	if(chunkedTransfer){
+		moreData = server->recvChunk();
+	}
+	else{
+		if(contentLength <= 0) return false;
+		if(contentLength > 1024){
+			server->recvData(1024);
+		}
+		else{
+			server->recvData(contentLength);
+		}
+	}
+	data = server->getData();
+	if(!data->length()){
+		delete data;
+		return false;
+	}
+	if (!chunkedTransfer) contentLength -= data->length();
 	browser->addData(data);
-	contentLength -= data->length();
-	return true;
+	return moreData;
 }
-void Proxy::sendServerResponseData(){
-	server->sendData();
+bool Proxy::sendServerResponseData(){
+	browser->sendData();
+	return true;
 }
 void Proxy::closeServerConnection(){
 	delete server;
+	server = nullptr;
 }
 
-void Proxy::filterHeaderFieldOut(HeaderField* h){
+HeaderField* Proxy::filterHeaderFieldOut(HeaderField* h){
 	static ci_string connectionToken;
 	ci_string name(h->first.c_str());
 	if(name == ci_string("Connection")){
@@ -153,14 +236,18 @@ void Proxy::filterHeaderFieldOut(HeaderField* h){
 		h->second = "Close";
 	}
 	else if(name == connectionToken){
-		return;
+		return nullptr;
 	}
 	else if(name == ci_string("Host")){
-		serverHostname = h->first;
+		serverHostname = h->second;
 	}
+	/*else if(name == ci_string("Cookie")){
+		return nullptr;
+	}*/
+	return h;
 }
 
-void Proxy::filterHeaderFieldIn(HeaderField* h){
+HeaderField* Proxy::filterHeaderFieldIn(HeaderField* h){
 	static ci_string connectionToken;
 	ci_string name(h->first.c_str());
 	if(name == ci_string("Connection")){
@@ -168,11 +255,26 @@ void Proxy::filterHeaderFieldIn(HeaderField* h){
 		h->second = "Close";
 	}
 	else if(name == connectionToken){
-		return;
+		return nullptr;
 	}
 	else if(name == ci_string("Content-Length")){
 		stringstream ss;
 		ss << h->second;
 		ss >> contentLength;
+		transferData = true;
+		cerr << "Found Content-Length: " << contentLength;
 	}
+	else if(name == ci_string("Transfer-Encoding")){
+		chunkedTransfer = true;
+		transferData = true;
+		cerr << "Transfer-Encoding: " << h->second << "<<<<<<<<<<<<<<<<<<<<<<<<<<" << endl;
+	}
+	return h;
+}
+
+void Proxy::send501NotImplented(){
+	browser->setStatusLine(new string("HTTP/1.1 501 Not Implemented"));
+	browser->addHeaderField("Connection", "Close");
+	browser->sendStatusLine();
+	browser->sendHeader();
 }

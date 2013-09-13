@@ -28,6 +28,12 @@ public:
 	HttpConnection(const Connection &conn);
 	virtual ~HttpConnection();
 
+	enum ReceivedType{
+		GET_REQUEST,
+		NOT_IMPLEMENTED_REQUEST,
+		RESPONSE
+	};
+
 	void setConnection(Connection &conn);
 
 	static HeaderField *newHeaderField(const std::string &name, const std::string &value);
@@ -45,14 +51,15 @@ public:
 	void sendHeader();
 	void sendData();
 
-	void recvStatusLine();
+	ReceivedType recvStatusLine();
 	void recvHeader();
-	void recvData();
-
+	void recvData(size_t length);
+	bool recvChunk();
 
 	HeaderField *getHeaderField();
 	std::string *getStatusLine();
 	std::string *getData();
+	int getStatusCode();
 
 private:
 	std::string *rStatusLine;
@@ -61,6 +68,7 @@ private:
 	std::string *sStatusLine;
 	std::queue<HeaderField*> sHeader;
 	std::string *sData;
+	int statusCode;
 };
 
 #endif /* HTTPCONNECTION_H_ */
