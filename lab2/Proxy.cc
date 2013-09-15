@@ -64,6 +64,8 @@ void Proxy::run(){
 		cerr << "Caught ConnectionException in Proxy::run: " << e.what() << endl;
 	}catch(HttpConnectionException &e){
 		cerr << "Caught HttpConnectionException in Proxy::run: " << e.what() << endl;
+	}catch(ProxyException &e){
+		cerr << "Caught ProxyException in Proxy::run: " << e.what() << endl;
 	}
 	closeServerConnection();
 }
@@ -174,7 +176,7 @@ bool Proxy::sendBrowserRequestData(){
 		}catch(ConnectionException &e){
 			if (e.error_number == ConnectionException::BROKEN_PIPE) cerr << "Aborted by server." << endl;
 			else cerr << "Send error" << e.what() << endl;
-			return false;
+			throw;
 		}
 	return true;
 }
@@ -272,7 +274,7 @@ bool Proxy::sendServerResponseData(){
 	}catch(ConnectionException &e){
 		if (e.error_number == ConnectionException::BROKEN_PIPE) cerr << "Aborted by browser." << endl;
 		else cerr << "Send error" << e.what() << endl;
-		return false;
+		throw;
 	}
 	return true;
 }
