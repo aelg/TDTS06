@@ -21,7 +21,7 @@ int doExit = false;
 void *connectionHandler(void *args){
 	Connection *browserConnection;
 
-	browserConnection = (Connection*) args;
+	browserConnection = reinterpret_cast<Connection*>(args);
 
 	HttpConnection *browserHttpConnection = new HttpConnection(*browserConnection);
 	delete browserConnection;
@@ -113,13 +113,14 @@ int main(){
 		// Fork.
 
 		pthread_create(&threadId, NULL, connectionHandler, (void*) newConnection);
+		pthread_join(threadId, NULL);
 		accepted[threadId] = newConnection;
 
 	}
 	server.stopListening();
 	cout << "Waiting for all connections to finish." << endl;
 	for(auto it = accepted.begin(); it != accepted.end(); ++it){
-		pthread_join(it->first, NULL);
+		//pthread_join(it->first, NULL);
 	}
 	cout << "Exiting." << endl;
 }

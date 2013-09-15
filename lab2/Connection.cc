@@ -11,24 +11,24 @@
 #include <cstring>
 #include <errno.h>
 #include <iostream>
+#include <unistd.h>
 
 #include "Connection.h"
 
 using namespace std;
 
 const int BUFFLENGTH = 4096; /* Internal buffer length used in recv and send. */
-const int STOP_RECEIVING = 0; /* Flag for shutdown. */
 const bool DEBUG = false;
 
-Connection::Connection() : socket(0), addr(),
+Connection::Connection() : sockfd(0),
 		rBuff(new char[BUFFLENGTH]), rBuffPos(0), rBuffLength(0),
 		sBuff(new char[BUFFLENGTH]), connected(true){}
 
-Connection::Connection(int socket, sockaddr &addr) : socket(socket), addr(addr),
+Connection::Connection(int socket) : sockfd(socket),
 		rBuff(new char[BUFFLENGTH]), rBuffPos(0), rBuffLength(0),
 		sBuff(new char[BUFFLENGTH]), connected(true){}
 
-Connection::Connection(const Connection &old): socket(old.socket), addr(old.addr),
+Connection::Connection(const Connection &old): sockfd(old.sockfd),
 		rBuff(new char[BUFFLENGTH]), rBuffPos(0), rBuffLength(0), sBuff(new char[BUFFLENGTH]),
 		connected(true){
 	for(int i = 0; i < BUFFLENGTH; ++i){
@@ -43,8 +43,7 @@ Connection& Connection::operator=(const Connection &rhs){
 		rBuff[i] = rhs.rBuff[i];
 		sBuff[i] = rhs.sBuff[i];
 	}
-	socket = rhs.socket;
-	addr = rhs.addr;
+	sockfd = rhs.sockfd;
 	return *this;
 }
 
@@ -54,8 +53,7 @@ Connection::~Connection(){
 }
 
 void Connection::setConnection(Connection &conn){
-	socket = conn.socket;
-	addr = conn.addr;
+	sockfd = conn.sockfd;
 }
 
 /**
@@ -70,32 +68,51 @@ void Connection::sendString(std::string *&data){
 		throw ConnectionException(string("sendString called while not connected."),
 				ConnectionException::NOT_CONNECTED);
 	}
-	int len = data->length();
-	int pos = 0;
-	int sent;
+	size_t len = data->length();
+	size_t pos = 0;
+	size_t sent = 0;
 	while(len > 0){
+		sent = 0;
 		if (len > BUFFLENGTH){
 			memcpy(sBuff, data->c_str()+pos, BUFFLENGTH);
 
-			if((sent = send(socket, sBuff, BUFFLENGTH, 0)) == -1){
-				if(errno == EPIPE){
-					connected = false;
-					throw ConnectionException(string("send failed: Broken Pipe") + string(strerror(errno)),
-																		ConnectionException::BROKEN_PIPE);
+			while(sent < BUFFLENGTH){
+				int n = 0;
+				if((n = send(sockfd, sBuff+sent, BUFFLENGTH-sent, 0)) == -1){
+					if(errno == EPIPE){
+						connected = false;
+						throw ConnectionException(string("send failed: Broken Pipe") + string(strerror(errno)),
+								ConnectionException::BROKEN_PIPE);
+					}
+					else{
+						throw ConnectionException(string("send failed") + string(strerror(errno)),
+								ConnectionException::SEND_ERROR);
+					}
 				}
-				else{
-					throw ConnectionException(string("send failed") + string(strerror(errno)),
-																		ConnectionException::SEND_ERROR);
-				}
+				sent += n;
 			}
-			if(DEBUG) cerr << ">>>>>>" << string(sBuff, sent) << "||" << endl;
+			if(DEBUG) cerr << ">>>>>>" << string(sBuff, sent) << "||" << sent << endl;
 			pos += BUFFLENGTH;
 			len -= BUFFLENGTH;
 		}
 		else{
 			memcpy(sBuff, data->c_str()+pos, len);
-			sent = send(socket, sBuff, len, 0);
-			if(DEBUG) cerr << ">>>>>>" << string(sBuff, sent) << "||" << endl;
+			while(sent < len){
+				int n = 0;
+				if((n = send(sockfd, sBuff+sent, len-sent, 0)) == -1){
+					if(errno == EPIPE){
+						connected = false;
+						throw ConnectionException(string("send failed: Broken Pipe") + string(strerror(errno)),
+								ConnectionException::BROKEN_PIPE);
+					}
+					else{
+						throw ConnectionException(string("send failed") + string(strerror(errno)),
+								ConnectionException::SEND_ERROR);
+					}
+				}
+				sent += n;
+			}
+			if(DEBUG) cerr << ">>>>>>" << string(sBuff, sent) << "||asdf" << sent << endl;
 			len = 0;
 		}
 	}
@@ -148,25 +165,29 @@ string *Connection::recvTerminatedString(char term){
  * Note: The returned string must be deleted.
  */
 string *Connection::recvString(size_t len){
+	size_t startlen = len;
 	string *s = new string();
 	for(;len > 0;){
+		//cerr << s->length() << " " << rBuffPos << " " << rBuffLength << " " << len << endl;
 		if(rBuffLength == 0){
 			if(connected){
 				updateRBuff();
 			}
 			else break;
 		}
+		//cerr << s->length() << " " << rBuffPos << " " << rBuffLength << endl;
 		if(rBuffLength >= len){
 			appendRBuff(s, len);
 			len = 0;
 		}
 		else if(rBuffLength > 0){
-			appendRBuff(s, rBuffLength);
 			len = len - rBuffLength;
+			appendRBuff(s, rBuffLength);
 		}
-		if(len == 0) break;
 	}
-	if(len != s->length()) cerr << "Differing lengths: " << len << " " << s->length() << endl;
+	if (startlen != s->length()){
+		//cerr << "Not all that was requested is received!! " << startlen << " " << s->length() << endl;
+	}
 	return s;
 }
 
@@ -201,7 +222,7 @@ void Connection::updateRBuff(){
 	}
 	int len;
 	errno = 0;
-	len = recv(socket, rBuff, BUFFLENGTH, 0);
+	len = recv(sockfd, rBuff, BUFFLENGTH, 0);
 	if(DEBUG) cerr << "<<<<<<" << string(rBuff, len) << "||" << len << endl;
 	if(len == -1){
 		if (errno == ECONNRESET || errno == ETIMEDOUT){
@@ -226,4 +247,10 @@ void Connection::updateRBuff(){
  */
 char *Connection::getRBuff(){
 	return rBuff + rBuffPos;
+}
+
+void Connection::closeConnection(){
+	//shutdown(sockfd, SHUT_RDWR);
+	close(sockfd);
+	//connected = false;
 }

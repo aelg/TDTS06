@@ -42,10 +42,11 @@ private:
 	bool transferBrowserRequest();
 	bool setupServerConnection();
 	bool sendBrowserRequest();
+	bool sendBrowserRequestData();
 	bool readServerResponse();
 	bool transferServerResponseHeader();
 	bool sendServerResponseHeader();
-	bool transferServerResponseData();
+	bool transferData(HttpConnection* from, HttpConnection *to);
 	bool sendServerResponseData();
 	void closeServerConnection();
 
@@ -59,7 +60,8 @@ private:
 
 	std::string serverHostname;
 	int contentLength;
-	bool transferData;
+	bool transferResponseData;
+	bool transferRequestData;
 	bool chunkedTransfer;
 };
 

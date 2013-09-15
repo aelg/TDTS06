@@ -30,6 +30,7 @@ public:
 
 	enum ReceivedType{
 		GET_REQUEST,
+		POST_REQUEST,
 		NOT_IMPLEMENTED_REQUEST,
 		RESPONSE
 	};
@@ -54,12 +55,14 @@ public:
 	ReceivedType recvStatusLine();
 	void recvHeader();
 	void recvData(size_t length);
-	bool recvChunk();
+	bool recvChunk(size_t length);
 
 	HeaderField *getHeaderField();
 	std::string *getStatusLine();
 	std::string *getData();
 	int getStatusCode();
+
+	void closeConnection();
 
 private:
 	std::string *rStatusLine;

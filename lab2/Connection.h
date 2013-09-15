@@ -34,7 +34,7 @@ class ConnectionException : public std::logic_error {
 class Connection{
 public:
 	Connection();
-	Connection(int socket, sockaddr &addr);
+	Connection(int socket);
 	Connection(const Connection &old);
 	Connection& operator=(const Connection &rhs);
 	~Connection();
@@ -46,13 +46,14 @@ public:
 
 	bool isGood();
 
+	void closeConnection();
+
 private:
 	void appendRBuff(std::string *s, size_t len);
 	void updateRBuff();
 	char *getRBuff();
 
-	int socket;
-	sockaddr addr;
+	int sockfd;
 	char *rBuff;
 	size_t rBuffPos;
 	size_t rBuffLength;

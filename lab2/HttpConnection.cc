@@ -6,6 +6,7 @@
  */
 
 #include <sstream>
+#include <algorithm>
 
 #include "HttpConnection.h"
 #include <iostream>
@@ -112,7 +113,7 @@ string* HttpConnection::getData(){
 }
 HttpConnection::ReceivedType HttpConnection::recvStatusLine(){
 	rStatusLine = recvTerminatedString('\n');
-	cerr << "Raw statusLine: " << *rStatusLine << "||" << endl;
+	//cerr << "Raw statusLine: " << *rStatusLine << "||" << endl;
 	statusCode = 0;
 	while(rStatusLine->back() == '\r' || rStatusLine->back() == '\n'){
 		rStatusLine->pop_back();
@@ -122,20 +123,23 @@ HttpConnection::ReceivedType HttpConnection::recvStatusLine(){
 	statusLine >> s;
 	if(s == "HTTP/1.1" || s == "HTTP/1.0"){ // This is a response
 		statusLine >> statusCode;
-		cerr << "!@!!!!!!!!! Status code: " << statusCode << endl;
 		cerr << *rStatusLine << endl;
 		return RESPONSE;
 	}
 	else if(s == "GET"){ // GET request all is well.
 		return GET_REQUEST;
 	}
-	else if(s == "POST" ||
+	else if(s == "POST"){ // POST request all is well.
+		return POST_REQUEST;
+	}
+	else if(s == "OPTIONS" ||
 					s == "HEAD" ||
-					s == "POST" ||
+					//s == "POST" ||
 					s == "PUT" ||
 					s == "DELETE" ||
 					s == "TRACE" ||
 					s == "CONNECT"){ /* Valid but we cannot handle them drop the connection */
+		cerr << "Unimplemented request: " << s << endl;
 		return NOT_IMPLEMENTED_REQUEST;
 	}
 	else{
@@ -169,42 +173,61 @@ void HttpConnection::recvData(size_t length){
 	rData = recvString(length);
 }
 
-bool HttpConnection::recvChunk(){
-	int chunkLength = 0;
+/**
+ * Receives one chunk of a chunked transfer.
+ * Returns false when the received chunk was the last.
+ */
+bool HttpConnection::recvChunk(size_t length){
+	size_t chunkLength = 0;
 	bool moreChunks = true;
-	string *size = recvTerminatedString('\n');
+	static size_t leftOfChunk = 0;
+	string *size;
 	string *chunk;
-	stringstream ss(*size);
-	ss >> hex >> chunkLength;
-	cerr << "ChunkLength: " << chunkLength << endl;
-	if(chunkLength > 0){
-		chunk = recvString(chunkLength+2);
+	rData = new string();
+	if(!leftOfChunk){
+		stringstream ss;
+		size = recvTerminatedString('\n');
+		ss >> *size;
+		rData->append(*size);
+		ss >> hex >> chunkLength;
+		leftOfChunk = chunkLength;
+		if(!ss.good()) cerr << "Warning chunklength extraction failed." << endl;
+	}
+	if(leftOfChunk > 0){
+		int recvSize = min(leftOfChunk+2, length);
+		chunk = recvString(recvSize);
+		leftOfChunk -= recvSize;
 	}
 	else{
 		moreChunks = false;
-		string* trailer = new string();
-		chunk = recvTerminatedString('\n');
+		chunk = new string();
+		string *trailer = recvTerminatedString('\n');
+		//cerr << "Trailer: " << *trailer <<  endl;
 		while(*trailer != "\r\n"){
 			chunk->append(*trailer);
 			delete trailer;
 			trailer = recvTerminatedString('\n');
+			//cerr << "Trailer: " << *trailer <<  endl;
 			if(trailer->length() == 0) break;
 		}
 		chunk->append(*trailer);
+		chunk->append("\r\n");
+		//cerr << "T: " << *chunk << endl;
 		delete trailer;
 	}
-	rData = new string();
-	rData->append(*size);
 	delete size;
 	rData->append(*chunk);
 	delete chunk;
-	//rData->append("\r\n");
 
 	return moreChunks;
 }
 
 int HttpConnection::getStatusCode(){
 	return statusCode;
+}
+
+void HttpConnection::closeConnection(){
+	Connection::closeConnection();
 }
 
 

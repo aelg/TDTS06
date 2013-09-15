@@ -22,8 +22,8 @@ int const STOP_RECEIVING = 0;
 using namespace std;
 
 Proxy::Proxy(HttpConnection *browser) : browser(browser), server(nullptr),
-																				contentLength(0), transferData(true),
-																				chunkedTransfer(false){}
+																				contentLength(0), transferResponseData(false),
+																				transferRequestData(false), chunkedTransfer(false){}
 
 Proxy::~Proxy() {
 	if(browser) delete browser;
@@ -31,17 +31,33 @@ Proxy::~Proxy() {
 }
 
 void Proxy::run(){
-	for(bool b = true; b; b = false){
+	for(int i = 0; i<1; ++i){
 		if(!readBrowserRequest()) break;
+		//cerr << "1" << endl;
 		if(!transferBrowserRequest()) break;
+		//cerr << "2" << endl;
 		if(!setupServerConnection()) break;
+		//cerr << "3" << endl;
 		if(!sendBrowserRequest()) break;
-		if(!readServerResponse()) break;
-		if(!transferServerResponseHeader()) break;
-		if(!sendServerResponseHeader()) break;
-		while(transferData && transferServerResponseData()){
-			sendServerResponseData();
+		//cerr << "4" << endl;
+		if(transferRequestData){
+			while(transferData(browser, server)){
+				sendBrowserRequestData();
+			}
 		}
+		//cerr << "5" << endl;
+		if(!readServerResponse()) break;
+		//cerr << "6" << endl;
+		if(!transferServerResponseHeader()) break;
+		//cerr << "7" << endl;
+		if(!sendServerResponseHeader()) break;
+		//cerr << "8" << endl;
+		if(transferResponseData){
+			while(transferData(server, browser)){
+				sendServerResponseData();
+			}
+		}
+		//cerr << "9" << endl;
 	}
 	closeServerConnection();
 }
@@ -51,12 +67,15 @@ bool Proxy::readBrowserRequest(){
 	try{
 		r = browser->recvStatusLine();
 	}catch(HttpConnectionException &e){
-		throw ProxyException(string("readBrowserRequest catched: ") + e.what(),
-												 ProxyException::UNKNOWN_ERROR);
+		cerr << "Connection closed." << endl;
+		return false;
+		//throw ProxyException(string("readBrowserRequest catched: ") + e.what(),
+		//										 ProxyException::UNKNOWN_ERROR);
 	}
 	browser->recvHeader();
 	switch(r){
 	case HttpConnection::GET_REQUEST:
+	case HttpConnection::POST_REQUEST:
 		break;
 	case HttpConnection::RESPONSE:
 		throw ProxyException("Received response from browser.", ProxyException::BAD_BROWSER);
@@ -76,11 +95,13 @@ bool Proxy::transferBrowserRequest(){
 	HeaderField *h;
 	size_t httpPos;
 	serverHostname = "";
+	contentLength = 0;
+	chunkedTransfer = false;
 
 	server = new HttpConnection(Connection());
 
 	statusLine = browser->getStatusLine();
-	cerr << "Status Line: " << *statusLine << endl;
+	//cerr << "Status Line: " << *statusLine << endl;
 
 	if((httpPos = statusLine->find("http://")) != string::npos){
 		statusLine->erase(httpPos, statusLine->find_first_of('/', httpPos+7) - httpPos);
@@ -91,6 +112,7 @@ bool Proxy::transferBrowserRequest(){
 		h = filterHeaderFieldOut(h);
 		if(h)server->addHeaderField(h);
 	}
+	server->addHeaderField("Connection", "Close");
 	return true;
 }
 
@@ -101,13 +123,12 @@ bool Proxy::setupServerConnection(){
 	}
 	int sockfd, rv;
 	struct addrinfo hints, *servinfo, *p;
-	struct sockaddr addr;
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_STREAM;
 
-	cerr << "Connecting to: '" << serverHostname.c_str() << '\''<< endl;
+	//cerr << "Connecting to: '" << serverHostname.c_str() << '\''<< endl;
 	if((rv = getaddrinfo(serverHostname.c_str(), "80", &hints, &servinfo)) != 0){
 		throw ProxyException(string("Remote server setup failed, getaddrinfo: ") + string(gai_strerror(rv)),
 				ProxyException::SETUP_SERVER_CONNECTION_ERROR);
@@ -120,7 +141,7 @@ bool Proxy::setupServerConnection(){
 			continue;
 		}
 		if(connect(sockfd, p->ai_addr, p->ai_addrlen) == -1){
-			shutdown(sockfd, STOP_RECEIVING);
+			shutdown(sockfd, SHUT_RDWR);
 			cerr << "Proxy::setupServerConnection: connect failed trying next addrinfo. Reason: "
 					 << strerror(errno);
 			continue;
@@ -132,8 +153,7 @@ bool Proxy::setupServerConnection(){
 						ProxyException::SETUP_SERVER_CONNECTION_ERROR);
 	}
 	freeaddrinfo(servinfo);
-	addr = *reinterpret_cast<sockaddr*>(p);
-	Connection newConnection(sockfd, addr);
+	Connection newConnection(sockfd);
 	server->setConnection(newConnection);
 	return true;
 }
@@ -142,21 +162,29 @@ bool Proxy::sendBrowserRequest(){
 	server->sendHeader();
 	return true;
 }
+bool Proxy::sendBrowserRequestData(){
+	try{
+			server->sendData();
+		}catch(ConnectionException &e){
+			if (e.error_number == ConnectionException::BROKEN_PIPE) cerr << "Aborted by server." << endl;
+			else cerr << "Send error" << e.what() << endl;
+			return false;
+		}
+	return true;
+}
 bool Proxy::readServerResponse(){
 	HttpConnection::ReceivedType r;
 	r = server->recvStatusLine();
 	server->recvHeader();
+	contentLength = 0;
+	transferResponseData = false;
+	chunkedTransfer = false;
 	switch(r){
 		case HttpConnection::GET_REQUEST:
+		case HttpConnection::POST_REQUEST:
 			throw ProxyException("Received GET request from server.", ProxyException::BAD_SERVER);
 			break;
 		case HttpConnection::RESPONSE:
-			if(server->getStatusCode() != 200){ //Don't know if data will be sent with other codes.
-				transferData = false;
-			}
-			else{
-				transferData = true;
-			}
 			break;
 		case HttpConnection::NOT_IMPLEMENTED_REQUEST:
 			// Shouldn't happen.
@@ -169,11 +197,9 @@ bool Proxy::readServerResponse(){
 	return true;
 }
 bool Proxy::transferServerResponseHeader(){
-	cerr << "transferServerResponseHeader" << endl;
+	//cerr << "transferServerResponseHeader" << endl;
 	string *statusLine;
 	HeaderField *h;
-	contentLength = 0;
-	chunkedTransfer = false;
 
 	statusLine = server->getStatusLine();
 	browser->setStatusLine(statusLine);
@@ -182,50 +208,80 @@ bool Proxy::transferServerResponseHeader(){
 		h = filterHeaderFieldIn(h);
 		if(h)browser->addHeaderField(h);
 	}
+	browser->addHeaderField("Connection", "Close");
 	return true;
 }
 
 bool Proxy::sendServerResponseHeader(){
-	cerr << "sendServerResponseHeader()" << endl;
-	cerr << "transferData: " << transferData << endl;
+	//cerr << "sendServerResponseHeader()" << endl;
+	//cerr << "transferResponseData: " << transferResponseData << endl;
 	browser->sendStatusLine();
 	browser->sendHeader();
+	if(server->getStatusCode() != 200 && transferResponseData) cerr << "OMG!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!111111" << endl;
 	return true;
 }
 
-bool Proxy::transferServerResponseData(){
-	cerr << "transferServerResponseData()" << endl;
-	cerr << "Content-Length: " << contentLength << endl;
+bool Proxy::transferData(HttpConnection* from, HttpConnection *to){
+	//cerr << "transferServerResponseData()" << endl;
+	//cerr << "Content-Length: " << contentLength << endl;
 	string* data;
-	bool moreData = true;
-	if(chunkedTransfer){
-		moreData = server->recvChunk();
-	}
-	else{
-		if(contentLength <= 0) return false;
-		if(contentLength > 1024){
-			server->recvData(1024);
-		}
-		else{
-			server->recvData(contentLength);
-		}
-	}
-	data = server->getData();
-	if(!data->length()){
-		delete data;
+	if(!chunkedTransfer && contentLength <= 0){
 		return false;
 	}
-	if (!chunkedTransfer) contentLength -= data->length();
-	browser->addData(data);
-	return moreData;
+	if(chunkedTransfer){
+		if(!from->recvChunk(1024)){
+			chunkedTransfer = false;
+			contentLength = 0;
+		}
+	}
+	else{
+		//cerr << "ContentLength is now: " << contentLength << endl;
+		if(contentLength > 1024){
+			from->recvData(1024);
+		}
+		else{
+			from->recvData(contentLength);
+		}
+	}
+	data = from->getData();
+	//cerr << "data length: " << data->length() << endl;
+	/*if(!data->length()){
+		delete data;
+		return false;
+	}*/
+	if (!chunkedTransfer){
+		contentLength -= data->length();
+	}
+
+		//cerr << "Adding chunk of size: " << data->length() << endl;
+
+	to->addData(data);
+	return true;
 }
+
 bool Proxy::sendServerResponseData(){
-	browser->sendData();
+	//cerr << "sendData" << endl;
+	try{
+		browser->sendData();
+	}catch(ConnectionException &e){
+		if (e.error_number == ConnectionException::BROKEN_PIPE) cerr << "Aborted by browser." << endl;
+		else cerr << "Send error" << e.what() << endl;
+		return false;
+	}
 	return true;
 }
 void Proxy::closeServerConnection(){
-	delete server;
-	server = nullptr;
+	if(browser){
+		browser->closeConnection();
+		delete browser;
+		browser = nullptr;
+	}
+	if(server){
+		server->closeConnection();
+		delete server;
+		server = nullptr;
+	}
+
 }
 
 HeaderField* Proxy::filterHeaderFieldOut(HeaderField* h){
@@ -234,16 +290,31 @@ HeaderField* Proxy::filterHeaderFieldOut(HeaderField* h){
 	if(name == ci_string("Connection")){
 		connectionToken = ci_string(h->second.c_str());
 		h->second = "Close";
+		delete h;
+		return nullptr;
 	}
 	else if(name == connectionToken){
+		delete h;
 		return nullptr;
 	}
 	else if(name == ci_string("Host")){
 		serverHostname = h->second;
 	}
-	/*else if(name == ci_string("Cookie")){
-		return nullptr;
-	}*/
+	else if(name == ci_string("Content-Length")){
+		stringstream ss;
+		ss << h->second;
+		ss >> contentLength;
+		if(contentLength > 0) transferRequestData = true;
+		//cerr << "Found Content-Length: " << contentLength;
+	}
+	else if(name == ci_string("Transfer-Encoding")){
+		chunkedTransfer = true;
+		transferRequestData = true;
+		//cerr << "Transfer-Encoding: " << h->second << "<<<<<<<<<<<<<<<<<<<<<<<<<<" << endl;
+	}
+	else if(name == ci_string("Transfer-coding")){
+		//cerr << "Transfer-coding <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<" << endl;
+	}
 	return h;
 }
 
@@ -253,21 +324,24 @@ HeaderField* Proxy::filterHeaderFieldIn(HeaderField* h){
 	if(name == ci_string("Connection")){
 		connectionToken = ci_string(h->second.c_str());
 		h->second = "Close";
+		delete h;
+		return nullptr;
 	}
 	else if(name == connectionToken){
+		delete h;
 		return nullptr;
 	}
 	else if(name == ci_string("Content-Length")){
 		stringstream ss;
 		ss << h->second;
 		ss >> contentLength;
-		transferData = true;
-		cerr << "Found Content-Length: " << contentLength;
+		if(contentLength > 0) transferResponseData = true;
+		//cerr << "Found Content-Length: " << contentLength << endl;
 	}
 	else if(name == ci_string("Transfer-Encoding")){
 		chunkedTransfer = true;
-		transferData = true;
-		cerr << "Transfer-Encoding: " << h->second << "<<<<<<<<<<<<<<<<<<<<<<<<<<" << endl;
+		transferResponseData = true;
+		//cerr << "Transfer-Encoding: " << h->second << "<<<<<<<<<<<<<<<<<<<<<<<<<<" << endl;
 	}
 	return h;
 }

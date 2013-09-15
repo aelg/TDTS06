@@ -95,7 +95,7 @@ Server::Server(const char* port) : port(port){
 }
 
 Server::~Server(){
-  shutdown(s, STOP_RECEIVING);
+  shutdown(s, SHUT_RDWR);
 }
 
 Connection *Server::acceptNew(){
@@ -117,12 +117,12 @@ Connection *Server::acceptNew(){
   	}
   }
 
-  cout << "New connection." << endl;
+  //cout << "New connection." << endl;
 
-  return new Connection(newSocket, their_addr);
+  return new Connection(newSocket);
 
 }
 
 void Server::stopListening(){
-	shutdown(s, STOP_RECEIVING);
+	shutdown(s, SHUT_RDWR);
 }
