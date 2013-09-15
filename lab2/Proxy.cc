@@ -31,33 +31,39 @@ Proxy::~Proxy() {
 }
 
 void Proxy::run(){
-	for(int i = 0; i<1; ++i){
-		if(!readBrowserRequest()) break;
-		//cerr << "1" << endl;
-		if(!transferBrowserRequest()) break;
-		//cerr << "2" << endl;
-		if(!setupServerConnection()) break;
-		//cerr << "3" << endl;
-		if(!sendBrowserRequest()) break;
-		//cerr << "4" << endl;
-		if(transferRequestData){
-			while(transferData(browser, server)){
-				sendBrowserRequestData();
+	try{
+		for(int i = 0; i<1; ++i){
+			if(!readBrowserRequest()) break;
+			//cerr << "1" << endl;
+			if(!transferBrowserRequest()) break;
+			//cerr << "2" << endl;
+			if(!setupServerConnection()) break;
+			//cerr << "3" << endl;
+			if(!sendBrowserRequest()) break;
+			//cerr << "4" << endl;
+			if(transferRequestData){
+				while(transferData(browser, server)){
+					sendBrowserRequestData();
+				}
 			}
-		}
-		//cerr << "5" << endl;
-		if(!readServerResponse()) break;
-		//cerr << "6" << endl;
-		if(!transferServerResponseHeader()) break;
-		//cerr << "7" << endl;
-		if(!sendServerResponseHeader()) break;
-		//cerr << "8" << endl;
-		if(transferResponseData){
-			while(transferData(server, browser)){
-				sendServerResponseData();
+			//cerr << "5" << endl;
+			if(!readServerResponse()) break;
+			//cerr << "6" << endl;
+			if(!transferServerResponseHeader()) break;
+			//cerr << "7" << endl;
+			if(!sendServerResponseHeader()) break;
+			//cerr << "8" << endl;
+			if(transferResponseData){
+				while(transferData(server, browser)){
+					sendServerResponseData();
+				}
 			}
+			//cerr << "9" << endl;
 		}
-		//cerr << "9" << endl;
+	}catch(ConnectionException &e){
+		cerr << "Caught ConnectionException in Proxy::run: " << e.what() << endl;
+	}catch(HttpConnectionException &e){
+		cerr << "Caught HttpConnectionException in Proxy::run: " << e.what() << endl;
 	}
 	closeServerConnection();
 }
