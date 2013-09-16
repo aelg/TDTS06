@@ -23,7 +23,9 @@ using namespace std;
 
 Proxy::Proxy(HttpConnection *browser) : browser(browser), server(nullptr),
 																				contentLength(0), transferResponseData(false),
-																				transferRequestData(false), chunkedTransfer(false){}
+																				transferRequestData(false), chunkedTransfer(false),
+																				shouldBeFiltered(false), savedAcceptEncoding(nullptr),
+																				filterBuffer(nullptr){}
 
 Proxy::~Proxy() {
 	if(browser) delete browser;
@@ -51,9 +53,26 @@ void Proxy::run(){
 			//cerr << "6" << endl;
 			if(!transferServerResponseHeader()) break;
 			//cerr << "7" << endl;
-			if(!sendServerResponseHeader()) break;
-			//cerr << "8" << endl;
-			if(transferResponseData){
+			if(shouldBeFiltered){
+				//cerr << "8" << endl;
+				if(transferResponseData){
+					while(transferData(server,browser));
+					if(filterData()){
+						if(!sendServerResponseHeader()) break;
+						browser->addData(filterBuffer);
+						if(!sendServerResponseData()) break;
+					}
+					else{
+						send303SeeOther("http://www.ida.liu.se/~TDTS04/labs/2011/ass2/error2.html");
+						break;
+					}
+				}
+				else {
+					if(!sendServerResponseHeader()) break;
+				}
+			}
+			else{
+				if(!sendServerResponseHeader()) break;
 				while(transferData(server, browser)){
 					sendServerResponseData();
 				}
@@ -75,8 +94,9 @@ bool Proxy::readBrowserRequest(){
 	try{
 		r = browser->recvStatusLine();
 	}catch(HttpConnectionException &e){
-		cerr << "Connection closed." << endl;
-		return false;
+		cerr << "Connection closed.\nFil: " << __FILE__ << "\nRad: " << __LINE__ << endl;
+		throw;
+		//return false;
 		//throw ProxyException(string("readBrowserRequest catched: ") + e.what(),
 		//										 ProxyException::UNKNOWN_ERROR);
 	}
@@ -121,6 +141,12 @@ bool Proxy::transferBrowserRequest(){
 		if(h)server->addHeaderField(h);
 	}
 	server->addHeaderField("Connection", "Close");
+	if(savedAcceptEncoding){
+		if(shouldBeFiltered){
+			savedAcceptEncoding->second = "";
+		}
+		server->addHeaderField(savedAcceptEncoding);
+	}
 	return true;
 }
 
@@ -184,7 +210,7 @@ bool Proxy::readServerResponse(){
 	HttpConnection::ReceivedType r;
 	r = server->recvStatusLine();
 	server->recvHeader();
-	contentLength = 0;
+	contentLength = -1;
 	transferResponseData = false;
 	chunkedTransfer = false;
 	switch(r){
@@ -193,6 +219,9 @@ bool Proxy::readServerResponse(){
 			throw ProxyException("Received GET request from server.", ProxyException::BAD_SERVER);
 			break;
 		case HttpConnection::RESPONSE:
+			if(server->getStatusCode() == 200){
+				transferResponseData = true;
+			}
 			break;
 		case HttpConnection::NOT_IMPLEMENTED_REQUEST:
 			// Shouldn't happen.
@@ -233,7 +262,7 @@ bool Proxy::transferData(HttpConnection* from, HttpConnection *to){
 	//cerr << "transferServerResponseData()" << endl;
 	//cerr << "Content-Length: " << contentLength << endl;
 	string* data;
-	if(!chunkedTransfer && contentLength <= 0){
+	if(!chunkedTransfer && contentLength == 0){
 		return false;
 	}
 	if(chunkedTransfer){
@@ -244,7 +273,7 @@ bool Proxy::transferData(HttpConnection* from, HttpConnection *to){
 	}
 	else{
 		//cerr << "ContentLength is now: " << contentLength << endl;
-		if(contentLength > 1024){
+		if(contentLength > 1024 || contentLength == -1){
 			from->recvData(1024);
 		}
 		else{
@@ -252,19 +281,26 @@ bool Proxy::transferData(HttpConnection* from, HttpConnection *to){
 		}
 	}
 	data = from->getData();
+	if(data && shouldBeFiltered){
+		if(!filterBuffer) filterBuffer = new string();
+		filterBuffer->append(*data);
+	}
 	//cerr << "data length: " << data->length() << endl;
 	/*if(!data->length()){
 		delete data;
 		return false;
 	}*/
-	if (!chunkedTransfer){
+	if (!chunkedTransfer && contentLength != -1){
 		contentLength -= data->length();
 	}
 
 		//cerr << "Adding chunk of size: " << data->length() << endl;
 
-	to->addData(data);
-	return true;
+	if(data){
+		to->addData(data);
+		return true;
+	}
+	else return false;
 }
 
 bool Proxy::sendServerResponseData(){
@@ -320,8 +356,15 @@ HeaderField* Proxy::filterHeaderFieldOut(HeaderField* h){
 		transferRequestData = true;
 		//cerr << "Transfer-Encoding: " << h->second << "<<<<<<<<<<<<<<<<<<<<<<<<<<" << endl;
 	}
-	else if(name == ci_string("Transfer-coding")){
-		//cerr << "Transfer-coding <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<" << endl;
+	else if(name == ci_string("Accept-Encoding")){
+		cerr << h->first << ": " << h->second << endl;
+		savedAcceptEncoding = h;
+		h = nullptr;
+	}
+	else if(name == ci_string("Accept")){
+		if(h->second.find("text") != string::npos){
+			shouldBeFiltered = true;
+		}
 	}
 	return h;
 }
@@ -346,16 +389,34 @@ HeaderField* Proxy::filterHeaderFieldIn(HeaderField* h){
 		if(contentLength > 0) transferResponseData = true;
 		//cerr << "Found Content-Length: " << contentLength << endl;
 	}
-	else if(name == ci_string("Transfer-Encoding")){
-		chunkedTransfer = true;
-		transferResponseData = true;
-		//cerr << "Transfer-Encoding: " << h->second << "<<<<<<<<<<<<<<<<<<<<<<<<<<" << endl;
+	else if(name == ci_string("Content-Type")){
+		cerr << h->first << ": " << h->second << endl;
+		if(h->second.find("text") != string::npos){
+			shouldBeFiltered = true;
+			cerr << "Will filter." << endl;
+		}
+		else{
+			shouldBeFiltered = false;
+		}
 	}
 	return h;
 }
 
+bool Proxy::filterData(){
+	if(filterBuffer->find("SpongeBob") == string::npos) return true;
+	else return false;
+}
+
 void Proxy::send501NotImplented(){
 	browser->setStatusLine(new string("HTTP/1.1 501 Not Implemented"));
+	browser->addHeaderField("Connection", "Close");
+	browser->sendStatusLine();
+	browser->sendHeader();
+}
+
+void Proxy::send303SeeOther(string location){
+	browser->setStatusLine(new string("HTTP/1.1 303 SeeOther"));
+	browser->addHeaderField("Location", location);
 	browser->addHeaderField("Connection", "Close");
 	browser->sendStatusLine();
 	browser->sendHeader();

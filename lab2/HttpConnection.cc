@@ -80,10 +80,16 @@ void HttpConnection::sendHeader(){
 	sendString(s);
 }
 void HttpConnection::addData(std::string *&s){
+	if(sData){
+		delete sData;
+	}
 	sData = s;
 	s = nullptr;
 }
 void HttpConnection::addData(std::string *&&s){
+	if(sData){
+		delete sData;
+	}
 	sData = s;
 }
 void HttpConnection::sendData(){
@@ -170,7 +176,9 @@ void HttpConnection::recvHeader(){
 }
 
 void HttpConnection::recvData(size_t length){
-	rData = recvString(length);
+	if(isGood()){
+		rData = recvString(length);
+	}
 }
 
 /**

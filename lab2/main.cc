@@ -97,7 +97,7 @@ int main(){
 	sa.sa_handler = SIG_IGN;
 	sigaction(SIGPIPE, &sa, NULL);
 
-	for(;;){
+	for(;!doExit;){
 		try{
 			newConnection = server.acceptNew();
 		}catch(ServerException &e){
@@ -113,14 +113,14 @@ int main(){
 		// Fork.
 
 		pthread_create(&threadId, NULL, connectionHandler, (void*) newConnection);
-		pthread_join(threadId, NULL);
+		//pthread_join(threadId, NULL);
 		accepted[threadId] = newConnection;
 
 	}
 	server.stopListening();
 	cout << "Waiting for all connections to finish." << endl;
 	for(auto it = accepted.begin(); it != accepted.end(); ++it){
-		//pthread_join(it->first, NULL);
+		pthread_join(it->first, NULL);
 	}
 	cout << "Exiting." << endl;
 }

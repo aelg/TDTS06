@@ -53,7 +53,10 @@ private:
 	HeaderField* filterHeaderFieldOut(HeaderField* h);
 	HeaderField* filterHeaderFieldIn(HeaderField* h);
 
+	bool filterData();
+
 	void send501NotImplented();
+	void send303SeeOther(std::string location);
 
 	HttpConnection *browser;
 	HttpConnection *server;
@@ -63,6 +66,9 @@ private:
 	bool transferResponseData;
 	bool transferRequestData;
 	bool chunkedTransfer;
+	bool shouldBeFiltered;
+	HeaderField *savedAcceptEncoding;
+	std::string *filterBuffer;
 };
 
 #endif /* PROXY_H_ */
