@@ -30,6 +30,7 @@ Proxy::Proxy(HttpConnection *browser) : browser(browser), server(nullptr),
 Proxy::~Proxy() {
 	if(browser) delete browser;
 	if(server) delete server;
+	if(filterBuffer) delete filterBuffer;
 }
 
 void Proxy::run(){
@@ -57,14 +58,20 @@ void Proxy::run(){
 				//cerr << "8" << endl;
 				if(transferResponseData){
 					while(transferData(server,browser));
-					if(filterData()){
-						if(!sendServerResponseHeader()) break;
-						browser->addData(filterBuffer);
-						if(!sendServerResponseData()) break;
+					if(filterBuffer){
+						if(filterData()){
+							if(!sendServerResponseHeader()) break;
+							browser->addData(filterBuffer);
+							filterBuffer = nullptr;
+							if(!sendServerResponseData()) break;
+						}
+						else{
+							send303SeeOther("http://www.ida.liu.se/~TDTS04/labs/2011/ass2/error2.html");
+							break;
+						}
 					}
-					else{
-						send303SeeOther("http://www.ida.liu.se/~TDTS04/labs/2011/ass2/error2.html");
-						break;
+					else {
+						sendServerResponseHeader();
 					}
 				}
 				else {
