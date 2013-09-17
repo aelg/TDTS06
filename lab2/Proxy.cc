@@ -9,6 +9,7 @@
 #include <cstring>
 #include <sstream>
 #include <iostream>
+#include <vector>
 #include <errno.h>
 #include <netdb.h>
 #include <sys/types.h>
@@ -21,11 +22,12 @@ int const STOP_RECEIVING = 0;
 
 using namespace std;
 
-Proxy::Proxy(HttpConnection *browser) : browser(browser), server(nullptr),
-																				contentLength(0), transferResponseData(false),
-																				transferRequestData(false), chunkedTransfer(false),
-																				shouldBeFiltered(false), savedAcceptEncoding(nullptr),
-																				filterBuffer(nullptr){}
+Proxy::Proxy(HttpConnection *browser, vector<ci_string> *filterWords) :
+		browser(browser), server(nullptr),
+		contentLength(0), transferResponseData(false),
+		transferRequestData(false), chunkedTransfer(false),
+		shouldBeFiltered(false), savedAcceptEncoding(nullptr),
+		filterBuffer(nullptr), filterWords(filterWords){}
 
 Proxy::~Proxy() {
 	if(browser) delete browser;
@@ -137,6 +139,14 @@ bool Proxy::transferBrowserRequest(){
 
 	statusLine = browser->getStatusLine();
 	//cerr << "Status Line: " << *statusLine << endl;
+	ci_string ci_statusLine(statusLine->c_str());
+	for(auto it = filterWords->begin(); it != filterWords->end(); ++it){
+		if(ci_statusLine.find(*it) != string::npos){
+			send303SeeOther("http://www.ida.liu.se/~TDTS04/labs/2011/ass2/error1.html");
+			delete statusLine;
+			return false;
+		}
+	}
 
 	if((httpPos = statusLine->find("http://")) != string::npos){
 		statusLine->erase(httpPos, statusLine->find_first_of('/', httpPos+7) - httpPos);
@@ -410,8 +420,11 @@ HeaderField* Proxy::filterHeaderFieldIn(HeaderField* h){
 }
 
 bool Proxy::filterData(){
-	if(filterBuffer->find("SpongeBob") == string::npos) return true;
-	else return false;
+	ci_string ci_filterBuffer(filterBuffer->c_str());
+	for(auto it = filterWords->begin(); it != filterWords->end(); ++it){
+		if(ci_filterBuffer.find(*it) != string::npos) return false;
+	}
+	return true;
 }
 
 void Proxy::send501NotImplented(){

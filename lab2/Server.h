@@ -38,6 +38,7 @@ class Server {
     ~Server();
     Connection *acceptNew();
     void stopListening();
+    void setPort(const char* port);
 
     static const int BACKLOG = 4;
     static const int ERROR = -1;

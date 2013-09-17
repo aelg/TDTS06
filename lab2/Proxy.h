@@ -11,6 +11,7 @@
 
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #include "HttpConnection.h"
 
@@ -32,7 +33,7 @@ class Proxy {
 public:
 	Proxy() = delete;
 	Proxy(const Proxy&) = delete;
-	Proxy(HttpConnection *browser);
+	Proxy(HttpConnection *browser, std::vector<ci_string> *filterWords);
 	virtual ~Proxy();
 
 	void run();
@@ -69,6 +70,7 @@ private:
 	bool shouldBeFiltered;
 	HeaderField *savedAcceptEncoding;
 	std::string *filterBuffer;
+	std::vector<ci_string> *filterWords;
 };
 
 #endif /* PROXY_H_ */

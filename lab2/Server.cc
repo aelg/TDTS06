@@ -126,3 +126,7 @@ Connection *Server::acceptNew(){
 void Server::stopListening(){
 	shutdown(s, SHUT_RDWR);
 }
+
+void Server::setPort(const char* port){
+	this->port = port;
+}

@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -18,16 +19,24 @@ using namespace std;
 
 int doExit = false;
 
+struct ThreadData{
+	Connection *connection;
+	vector<ci_string> *filterWords;
+};
+
 void *connectionHandler(void *args){
+	ThreadData *threadData;
 	Connection *browserConnection;
 
-	browserConnection = reinterpret_cast<Connection*>(args);
+	threadData = reinterpret_cast<ThreadData*>(args);
+	browserConnection = threadData->connection;
 
 	HttpConnection *browserHttpConnection = new HttpConnection(*browserConnection);
 	delete browserConnection;
 
-	Proxy p(browserHttpConnection);
+	Proxy p(browserHttpConnection, threadData->filterWords);
 	p.run();
+	delete threadData;
 	return nullptr;
 }
 
@@ -36,11 +45,22 @@ void SIGINTHandler(int){
 	doExit = true;
 }
 
-int main(){
-	Server server("8080");
+vector<ci_string> *readFilterWords(){
+	char word[200];
+	vector<ci_string> *filterWords = new vector<ci_string>; // This will unfortunately not be freed.
+	ifstream f("filterWords.txt");
+	while(f.getline(word, 200)){
+		filterWords->push_back(ci_string(word));
+	}
+	return filterWords;
+}
+
+int main(int argc, char *argv[]){
+	Server server;
 	Connection *newConnection;
 	pthread_t threadId;
 	map<pthread_t, Connection *> accepted;
+	vector<ci_string> *filterWords = readFilterWords();
 
 	struct sigaction sa;
 	sa.sa_handler = SIGINTHandler;
@@ -49,6 +69,10 @@ int main(){
 	sigaction(SIGINT, &sa, NULL);
 	sa.sa_handler = SIG_IGN;
 	sigaction(SIGPIPE, &sa, NULL);
+
+	if(argc == 2){
+		server.setPort(argv[1]);
+	}
 
 	for(;!doExit;){
 		try{
@@ -65,7 +89,9 @@ int main(){
 		}
 		// Fork.
 
-		pthread_create(&threadId, NULL, connectionHandler, (void*) newConnection);
+
+
+		pthread_create(&threadId, NULL, connectionHandler, (void*) new ThreadData{newConnection, filterWords});
 		//pthread_join(threadId, NULL);
 		//accepted[threadId] = newConnection;
 
