@@ -13,8 +13,6 @@
 
 using namespace std;
 
-size_t const CHUNK_LENGTH = 2024;
-
 HttpConnection::HttpConnection(const Connection &conn) : Connection(conn), rStatusLine(0),
 		rHeader(), rData(0), sStatusLine(0), sHeader(), sData(0), statusCode(0){}
 
@@ -119,7 +117,6 @@ string* HttpConnection::getData(){
 }
 HttpConnection::ReceivedType HttpConnection::recvStatusLine(){
 	rStatusLine = recvTerminatedString('\n');
-	//cerr << "Raw statusLine: " << *rStatusLine << "||" << endl;
 	statusCode = 0;
 	while(rStatusLine->back() == '\r' || rStatusLine->back() == '\n'){
 		rStatusLine->pop_back();
@@ -210,17 +207,14 @@ bool HttpConnection::recvChunk(size_t length){
 		moreChunks = false;
 		chunk = new string();
 		string *trailer = recvTerminatedString('\n');
-		//cerr << "Trailer: " << *trailer <<  endl;
 		while(*trailer != "\r\n"){
 			chunk->append(*trailer);
 			delete trailer;
 			trailer = recvTerminatedString('\n');
-			//cerr << "Trailer: " << *trailer <<  endl;
 			if(trailer->length() == 0) break;
 		}
 		chunk->append(*trailer);
 		chunk->append("\r\n");
-		//cerr << "T: " << *chunk << endl;
 		delete trailer;
 	}
 	delete size;

@@ -3,6 +3,9 @@
  *
  *  Created by: Linus Mellberg
  *  12 sep 2013
+ *
+ *  Taken from http://stackoverflow.com/a/2886589/2752264
+ *  Typedefs ci_string a string class that does case insensitive comparisons.
  */
 
 #ifndef CI_STRING_H_

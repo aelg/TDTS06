@@ -24,6 +24,7 @@ struct ThreadData{
 	vector<ci_string> *filterWords;
 };
 
+/* Thread handler */
 void *connectionHandler(void *args){
 	ThreadData *threadData;
 	Connection *browserConnection;
@@ -34,21 +35,32 @@ void *connectionHandler(void *args){
 	HttpConnection *browserHttpConnection = new HttpConnection(*browserConnection);
 	delete browserConnection;
 
+	/* Start the proxy for the connection */
 	Proxy p(browserHttpConnection, threadData->filterWords);
 	p.run();
 	delete threadData;
 	return nullptr;
 }
 
+/* Handler for SIGINT signal, which is caused by ctrl+c.
+ * Setting doExit will cause main() to stop accepting connections and exit.
+ * The proxy will exit when all threads are done with their connections.
+ */
 void SIGINTHandler(int){
 	cerr << "SIGINT received." << endl;
 	doExit = true;
 }
 
-vector<ci_string> *readFilterWords(){
+vector<ci_string> *readFilterWords(const char * fileName){
 	char word[200];
-	vector<ci_string> *filterWords = new vector<ci_string>; // This will unfortunately not be freed.
-	ifstream f("filterWords.txt");
+	/* This will unfortunately not be freed. This is because the main thread
+	 * don't wait for the threads to exit and thus can't free this.
+	 * When a thread ends it has no way of knowing if it's the last.
+	 * This is no problem though since there will only be one of these
+	 * and it won't clog the memory.
+	 */
+	vector<ci_string> *filterWords = new vector<ci_string>;
+	ifstream f(fileName);
 	while(f.getline(word, 200)){
 		if(word[0] != '#' && word[0] != 0){ // Skip "# Comments" and empty lines.
 			filterWords->push_back(ci_string(word));
@@ -62,13 +74,19 @@ int main(int argc, char *argv[]){
 	Connection *newConnection;
 	pthread_t threadId;
 	map<pthread_t, Connection *> accepted;
-	vector<ci_string> *filterWords = readFilterWords();
 
+	/* Read filtered words from textfile. */
+	vector<ci_string> *filterWords = readFilterWords("filterWords.txt");
+
+	/* Setup handling of INTSIG (ctrl+c) */
 	struct sigaction sa;
 	sa.sa_handler = SIGINTHandler;
 	sigemptyset(&sa.sa_mask);
 	sa.sa_flags = 0;
 	sigaction(SIGINT, &sa, NULL);
+	/* Setup handling for SIGPIPE if this isn't done all threads
+	 * will die when SIGPIPE is received.
+	 */
 	sa.sa_handler = SIG_IGN;
 	sigaction(SIGPIPE, &sa, NULL);
 
@@ -90,20 +108,16 @@ int main(int argc, char *argv[]){
 				break;
 			}
 		}
+
 		// Fork.
-
-
-
 		pthread_create(&threadId, NULL, connectionHandler, (void*) new ThreadData{newConnection, filterWords});
-		//pthread_join(threadId, NULL);
-		//accepted[threadId] = newConnection;
+
+		// These threads won't be joined, so detach them to free resources when they exit.
+		pthread_detach(threadId);
 
 	}
 	server.stopListening();
-	cout << "Waiting for all connections to finish." << endl;
-	//for(auto it = accepted.begin(); it != accepted.end(); ++it){
-	//	pthread_join(it->first, NULL);
-	//}
 	cout << "Exiting." << endl;
+	cout << "The proxy will stop after all current connections has been closed." << endl;
 	pthread_exit(nullptr);
 }

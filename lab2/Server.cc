@@ -108,7 +108,6 @@ Connection *Server::acceptNew(){
   socklen_t addr_size;
   int newSocket = 0;
 
-  //their_addr = new sockaddr;
   addr_size = sizeof their_addr;
   if((newSocket = accept(s, &their_addr, &addr_size)) == -1){
   	if(errno == EINTR){
@@ -120,8 +119,6 @@ Connection *Server::acceptNew(){
   												  ServerException::ACCEPT_FAILED));
   	}
   }
-
-  //cout << "New connection." << endl;
 
   return new Connection(newSocket);
 

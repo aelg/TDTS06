@@ -79,6 +79,8 @@ void Connection::sendString(std::string *&data){
 			while(sent < BUFFLENGTH){
 				int n = 0;
 				if((n = send(sockfd, sBuff+sent, BUFFLENGTH-sent, 0)) == -1){
+					delete data;
+					data = nullptr;
 					if(errno == EPIPE){
 						connected = false;
 						throw ConnectionException(string("send failed: Broken Pipe") + string(strerror(errno)),
@@ -100,6 +102,8 @@ void Connection::sendString(std::string *&data){
 			while(sent < len){
 				int n = 0;
 				if((n = send(sockfd, sBuff+sent, len-sent, 0)) == -1){
+					delete data;
+					data = nullptr;
 					if(errno == EPIPE){
 						connected = false;
 						throw ConnectionException(string("send failed: Broken Pipe") + string(strerror(errno)),
@@ -165,17 +169,14 @@ string *Connection::recvTerminatedString(char term){
  * Note: The returned string must be deleted.
  */
 string *Connection::recvString(size_t len){
-	size_t startlen = len;
 	string *s = new string();
 	for(;len > 0;){
-		//cerr << s->length() << " " << rBuffPos << " " << rBuffLength << " " << len << endl;
 		if(rBuffLength == 0){
 			if(connected){
 				updateRBuff();
 			}
 			else break;
 		}
-		//cerr << s->length() << " " << rBuffPos << " " << rBuffLength << endl;
 		if(rBuffLength >= len){
 			appendRBuff(s, len);
 			len = 0;
@@ -184,9 +185,6 @@ string *Connection::recvString(size_t len){
 			len = len - rBuffLength;
 			appendRBuff(s, rBuffLength);
 		}
-	}
-	if (startlen != s->length()){
-		//cerr << "Not all that was requested is received!! " << startlen << " " << s->length() << endl;
 	}
 	return s;
 }
@@ -250,7 +248,5 @@ char *Connection::getRBuff(){
 }
 
 void Connection::closeConnection(){
-	//shutdown(sockfd, SHUT_RDWR);
 	close(sockfd);
-	//connected = false;
 }
