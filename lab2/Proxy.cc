@@ -128,6 +128,8 @@ bool Proxy::transferBrowserRequest(){
 	server = new HttpConnection(Connection());
 
 	statusLine = browser->getStatusLine();
+
+	// Filter status line.
 	ci_string ci_statusLine(statusLine->c_str());
 	for(auto it = filterWords->begin(); it != filterWords->end(); ++it){
 		if(ci_statusLine.find(*it) != string::npos){
