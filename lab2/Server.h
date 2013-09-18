@@ -36,6 +36,7 @@ class Server {
   public:
     Server(const char* port = DEFAULT_PORT);
     ~Server();
+    void init();
     Connection *acceptNew();
     void stopListening();
     void setPort(const char* port);

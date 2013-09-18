@@ -50,7 +50,9 @@ vector<ci_string> *readFilterWords(){
 	vector<ci_string> *filterWords = new vector<ci_string>; // This will unfortunately not be freed.
 	ifstream f("filterWords.txt");
 	while(f.getline(word, 200)){
-		filterWords->push_back(ci_string(word));
+		if(word[0] != '#' && word[0] != 0){ // Skip "# Comments" and empty lines.
+			filterWords->push_back(ci_string(word));
+		}
 	}
 	return filterWords;
 }
@@ -73,6 +75,7 @@ int main(int argc, char *argv[]){
 	if(argc == 2){
 		server.setPort(argv[1]);
 	}
+	server.init();
 
 	for(;!doExit;){
 		try{

@@ -33,7 +33,14 @@ const int STOP_RECEIVING = 0;
  * port: Port number to listen to.
  *
  */
-Server::Server(const char* port) : port(port){
+Server::Server(const char* port) : s(0), port(port){}
+
+
+Server::~Server(){
+  shutdown(s, SHUT_RDWR);
+}
+
+void Server::init(){
   int status;
   int yes = 1;
   struct addrinfo hints;
@@ -94,9 +101,6 @@ Server::Server(const char* port) : port(port){
   cout << "Waiting for connections." << endl;
 }
 
-Server::~Server(){
-  shutdown(s, SHUT_RDWR);
-}
 
 Connection *Server::acceptNew(){
   
