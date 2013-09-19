@@ -58,6 +58,12 @@ void HttpConnection::addHeaderField(HeaderField *&header){
 void HttpConnection::addHeaderField(const string &name, const string &value){
 	sHeader.push(newHeaderField(name, value));
 }
+void HttpConnection::clearHeaderField(){
+	while(!sHeader.empty()){
+		delete sHeader.front();
+		sHeader.pop();
+	}
+}
 void HttpConnection::addContentLength(){
 	stringstream ss;
 	if(!sData) throw HttpConnectionException("addContentLength called with no added data.");

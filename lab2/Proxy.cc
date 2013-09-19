@@ -499,6 +499,7 @@ bool Proxy::filterData(){
  */
 void Proxy::send501NotImplented(){
 	browser->setStatusLine(new string("HTTP/1.1 501 Not Implemented"));
+	browser->clearHeaderField();
 	browser->addHeaderField("Connection", "Close");
 	browser->sendStatusLine();
 	browser->sendHeader();
@@ -509,6 +510,7 @@ void Proxy::send501NotImplented(){
  */
 void Proxy::send303SeeOther(string location){
 	browser->setStatusLine(new string("HTTP/1.1 303 SeeOther"));
+	browser->clearHeaderField();
 	browser->addHeaderField("Location", location);
 	browser->addHeaderField("Connection", "Close");
 	browser->sendStatusLine();

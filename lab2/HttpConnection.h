@@ -43,6 +43,7 @@ public:
 	void setStatusLine(std::string *&&s);
 	void addHeaderField(HeaderField *&header);
 	void addHeaderField(const std::string &name, const std::string &value);
+	void clearHeaderField();
 	void addData(std::string *&s);
 	void addData(std::string *&&s);
 
