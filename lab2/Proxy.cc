@@ -25,10 +25,9 @@ using namespace std;
 Proxy::Proxy(HttpConnection *browser, vector<ci_string> *filterWords) :
 		browser(browser), server(nullptr),
 		contentLength(0), transferResponseData(false),
-		transferRequestData(false), chunkedTransfer(false),
-		shouldBeFiltered(false), isCompressed(false),
-		savedAcceptEncoding(nullptr), filterBuffer(nullptr),
-		filterWords(filterWords){}
+		transferRequestData(false),	shouldBeFiltered(false),
+		isCompressed(false), savedAcceptEncoding(nullptr),
+		filterBuffer(nullptr), filterWords(filterWords){}
 
 Proxy::~Proxy() {
 	if(browser) delete browser;
@@ -137,7 +136,6 @@ bool Proxy::transferBrowserRequest(){
 	serverHostname = "";
 	serverPort = "80";
 	contentLength = 0;
-	chunkedTransfer = false;
 
 	// Instantiate server object.
 	server = new HttpConnection(Connection());
@@ -268,7 +266,6 @@ bool Proxy::readServerResponse(){
 	server->recvHeader();
 	contentLength = -1;
 	transferResponseData = false;
-	chunkedTransfer = false;
 	switch(r){
 		case HttpConnection::GET_REQUEST:
 		case HttpConnection::POST_REQUEST:
@@ -325,31 +322,22 @@ bool Proxy::sendServerResponseHeader(){
 
 /**
  * Transfers data between two connections. This is used both for outgoing and incoming data.
- * Handles both chunked transfers and reqular ones. If the transfer will be filtered
- * the data isn't sent but saved in filterBuffer instead.
+ * If the transfer will be filtered the data isn't sent but saved in filterBuffer instead.
  * It should be called multiple times and only transfers a little bit at each time to avoid
  * buffering to much data. When it returns false there is no more data to send.
  */
 bool Proxy::transferData(HttpConnection* from, HttpConnection *to){
 	string* data;
-	if(!chunkedTransfer && contentLength == 0){
+	if(contentLength == 0){
 		// We are done.
 		return false;
 	}
-	if(chunkedTransfer){
-		if(!from->recvChunk(BUFFLENGTH)){
-			chunkedTransfer = false;
-			contentLength = 0;
-		}
-	}
-	else{
 		if(contentLength > BUFFLENGTH || contentLength == -1){
 			from->recvData(BUFFLENGTH);
 		}
 		else{
 			from->recvData(contentLength);
 		}
-	}
 	data = from->getData();
 
 	// If we will filter add to filterBuffer.
@@ -357,7 +345,7 @@ bool Proxy::transferData(HttpConnection* from, HttpConnection *to){
 		if(!filterBuffer) filterBuffer = new string();
 		filterBuffer->append(*data);
 	}
-	if (!chunkedTransfer && contentLength != -1){
+	if (contentLength != -1){
 		contentLength -= data->length();
 	}
 
@@ -419,13 +407,6 @@ HeaderField* Proxy::filterHeaderFieldOut(HeaderField* h){
 		ss << h->second;
 		ss >> contentLength;
 		if(contentLength > 0) transferRequestData = true;
-	}
-	else if(name == ci_string("Transfer-Encoding")){
-		// Checking for chunked transfer.
-		if(ci_string(h->second.c_str()) != ci_string("identity")){
-			chunkedTransfer = true;
-			transferRequestData = true;
-		}
 	}
 	else if(name == ci_string("Accept-Encoding")){
 		/* Remove but save, we don't know yet if we should filter or not.

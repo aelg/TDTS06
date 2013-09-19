@@ -67,7 +67,6 @@ private:
 	int contentLength;
 	bool transferResponseData;
 	bool transferRequestData;
-	bool chunkedTransfer;
 	bool shouldBeFiltered;
 	bool isCompressed;
 	HeaderField *savedAcceptEncoding;

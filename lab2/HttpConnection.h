@@ -56,7 +56,6 @@ public:
 	ReceivedType recvStatusLine();
 	void recvHeader();
 	void recvData(size_t length);
-	bool recvChunk(size_t length);
 
 	HeaderField *getHeaderField();
 	std::string *getStatusLine();

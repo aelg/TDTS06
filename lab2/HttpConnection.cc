@@ -184,52 +184,6 @@ void HttpConnection::recvData(size_t length){
 	}
 }
 
-/**
- * Receives one chunk of a chunked transfer.
- * Returns false when the received chunk was the last.
- */
-bool HttpConnection::recvChunk(size_t length){
-	size_t chunkLength = 0;
-	bool moreChunks = true;
-	static size_t leftOfChunk = 0;
-	string *size;
-	string *chunk;
-	rData = new string();
-	if(!leftOfChunk){
-		stringstream ss;
-		size = recvTerminatedString('\n');
-		ss >> *size;
-		rData->append(*size);
-		ss >> hex >> chunkLength;
-		leftOfChunk = chunkLength;
-		if(!ss.good()) cerr << "Warning chunklength extraction failed." << endl;
-	}
-	if(leftOfChunk > 0){
-		int recvSize = min(leftOfChunk+2, length);
-		chunk = recvString(recvSize);
-		leftOfChunk -= recvSize;
-	}
-	else{
-		moreChunks = false;
-		chunk = new string();
-		string *trailer = recvTerminatedString('\n');
-		while(*trailer != "\r\n"){
-			chunk->append(*trailer);
-			delete trailer;
-			trailer = recvTerminatedString('\n');
-			if(trailer->length() == 0) break;
-		}
-		chunk->append(*trailer);
-		chunk->append("\r\n");
-		delete trailer;
-	}
-	delete size;
-	rData->append(*chunk);
-	delete chunk;
-
-	return moreChunks;
-}
-
 int HttpConnection::getStatusCode(){
 	return statusCode;
 }
