@@ -62,7 +62,6 @@ void Proxy::run(){
 					if(filterBuffer){
 						if(filterData()){ // Filter the data.
 							if(!sendServerResponseHeader()) break;
-							cerr << *filterBuffer << endl;
 							browser->addData(filterBuffer);
 							if(!sendServerResponseData()) break;
 						}
@@ -463,7 +462,6 @@ HeaderField* Proxy::filterHeaderFieldIn(HeaderField* h){
  */
 bool Proxy::filterData(){
 	ci_string ci_filterBuffer(filterBuffer->c_str());
-	cerr << *filterBuffer << endl;
 	for(auto it = filterWords->begin(); it != filterWords->end(); ++it){
 		if(ci_filterBuffer.find(*it) != string::npos) return false;
 	}
