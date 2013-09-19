@@ -54,7 +54,7 @@ void Proxy::run(){
 			}
 			if(!readServerResponse()) break;
 			if(!transferServerResponseHeader()) break;
-			if(shouldBeFiltered){
+			if(shouldBeFiltered){ //                       Ugliness begins.
 				if(transferResponseData){
 					// Read the data but don't send it.
 					while(transferData(server,browser));
@@ -62,6 +62,7 @@ void Proxy::run(){
 					if(filterBuffer){
 						if(filterData()){ // Filter the data.
 							if(!sendServerResponseHeader()) break;
+							cerr << *filterBuffer << endl;
 							browser->addData(filterBuffer);
 							if(!sendServerResponseData()) break;
 						}
@@ -83,7 +84,7 @@ void Proxy::run(){
 				while(transferData(server, browser)){
 					sendServerResponseData();
 				}
-			}
+			} //                                           Ugliness ends.
 		}
 	}catch(ConnectionException &e){
 		cerr << "Caught ConnectionException in Proxy::run: " << e.what() << endl;
@@ -264,12 +265,11 @@ bool Proxy::readServerResponse(){
 	HttpConnection::ReceivedType r;
 	r = server->recvStatusLine();
 	server->recvHeader();
-	contentLength = -1;
 	transferResponseData = false;
 	switch(r){
 		case HttpConnection::GET_REQUEST:
 		case HttpConnection::POST_REQUEST:
-			throw ProxyException("Received GET request from server.", ProxyException::BAD_SERVER);
+			throw ProxyException("Received GET or POST request from server.", ProxyException::BAD_SERVER);
 			break;
 		case HttpConnection::RESPONSE:
 			if(server->getStatusCode() == 200){
@@ -295,6 +295,7 @@ bool Proxy::transferServerResponseHeader(){
 	string *statusLine;
 	HeaderField *h;
 	isCompressed = false;
+	contentLength = -1;
 
 	statusLine = server->getStatusLine();
 	browser->setStatusLine(statusLine);
@@ -341,7 +342,7 @@ bool Proxy::transferData(HttpConnection* from, HttpConnection *to){
 	data = from->getData();
 
 	// If we will filter add to filterBuffer.
-	if(data && shouldBeFiltered){
+	if(data && shouldBeFiltered && to != server){ // to != server because we're not filtering outgoing POSTs
 		if(!filterBuffer) filterBuffer = new string();
 		filterBuffer->append(*data);
 	}
@@ -438,12 +439,6 @@ HeaderField* Proxy::filterHeaderFieldIn(HeaderField* h){
 	else if(name == connectionToken){
 		delete h;
 		return nullptr;
-	}
-	else if(name == ci_string("Content-Length")){
-		stringstream ss;
-		ss << h->second;
-		ss >> contentLength;
-		if(contentLength > 0) transferResponseData = true;
 	}
 	else if(name == ci_string("Content-Type")){
 		cerr << h->first << ": " << h->second << endl;
