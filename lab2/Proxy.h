@@ -63,11 +63,13 @@ private:
 	HttpConnection *server;
 
 	std::string serverHostname;
+	std::string serverPort;
 	int contentLength;
 	bool transferResponseData;
 	bool transferRequestData;
 	bool chunkedTransfer;
 	bool shouldBeFiltered;
+	bool isCompressed;
 	HeaderField *savedAcceptEncoding;
 	std::string *filterBuffer;
 	std::vector<ci_string> *filterWords;

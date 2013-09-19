@@ -15,6 +15,8 @@
 #include <string>
 #include <stdexcept>
 
+extern int const BUFFLENGTH;
+
 class ConnectionException : public std::logic_error {
  public:
 	enum Error{

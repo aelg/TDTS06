@@ -26,15 +26,21 @@ Proxy::Proxy(HttpConnection *browser, vector<ci_string> *filterWords) :
 		browser(browser), server(nullptr),
 		contentLength(0), transferResponseData(false),
 		transferRequestData(false), chunkedTransfer(false),
-		shouldBeFiltered(false), savedAcceptEncoding(nullptr),
-		filterBuffer(nullptr), filterWords(filterWords){}
+		shouldBeFiltered(false), isCompressed(false),
+		savedAcceptEncoding(nullptr), filterBuffer(nullptr),
+		filterWords(filterWords){}
 
 Proxy::~Proxy() {
 	if(browser) delete browser;
 	if(server) delete server;
 	if(filterBuffer) delete filterBuffer;
+	if(savedAcceptEncoding) delete savedAcceptEncoding;
 }
 
+/**
+ * Invoked to run the Proxy object. This function will
+ * run until the a request is handled.
+ */
 void Proxy::run(){
 	try{
 		for(int i = 0; i<1; ++i){
@@ -90,6 +96,9 @@ void Proxy::run(){
 	closeServerConnection();
 }
 
+/**
+ * Reads the header of the browsers request.
+ */
 bool Proxy::readBrowserRequest(){
 	HttpConnection::ReceivedType r;
 	try{
@@ -116,11 +125,17 @@ bool Proxy::readBrowserRequest(){
 	return true;
 }
 
+/**
+ * Transfer the header from the browser connection to the webserver connection.
+ * To do this it will read the Host header field, strip the http://... from the request
+ * and filter the header.
+ */
 bool Proxy::transferBrowserRequest(){
 	string* statusLine;
 	HeaderField *h;
 	size_t httpPos;
 	serverHostname = "";
+	serverPort = "80";
 	contentLength = 0;
 	chunkedTransfer = false;
 
@@ -168,6 +183,9 @@ bool Proxy::transferBrowserRequest(){
 	return true;
 }
 
+/**
+ * Setting up the connection to the webserver.
+ */
 bool Proxy::setupServerConnection(){
 	if(serverHostname.empty()){
 		throw ProxyException("setupServerConnection: Host header not found.",
@@ -176,13 +194,20 @@ bool Proxy::setupServerConnection(){
 	int sockfd, rv;
 	struct addrinfo hints, *servinfo, *p;
 
+	// Check if a remote port number is specified.
+	size_t colonPos;
+	if((colonPos = serverHostname.find(':')) != string::npos){
+		serverPort = serverHostname.substr(colonPos+1);
+		serverHostname.erase(colonPos);
+	}
+
 	// Standard socket stuff.
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_STREAM;
 
 	//cerr << "Connecting to: '" << serverHostname.c_str() << '\''<< endl;
-	if((rv = getaddrinfo(serverHostname.c_str(), "80", &hints, &servinfo)) != 0){
+	if((rv = getaddrinfo(serverHostname.c_str(), serverPort.c_str(), &hints, &servinfo)) != 0){
 		throw ProxyException(string("Remote server setup failed, getaddrinfo: ") + string(gai_strerror(rv)),
 				ProxyException::SETUP_SERVER_CONNECTION_ERROR);
 	}
@@ -210,11 +235,19 @@ bool Proxy::setupServerConnection(){
 	server->setConnection(newConnection);
 	return true;
 }
+
+/**
+ * Sends the request header to the webserver.
+ */
 bool Proxy::sendBrowserRequest(){
 	server->sendStatusLine();
 	server->sendHeader();
 	return true;
 }
+
+/**
+ * Sends data to the webserver.
+ */
 bool Proxy::sendBrowserRequestData(){
 	try{
 			server->sendData();
@@ -225,6 +258,10 @@ bool Proxy::sendBrowserRequestData(){
 		}
 	return true;
 }
+
+/**
+ * Reads the webservers response header.
+ */
 bool Proxy::readServerResponse(){
 	HttpConnection::ReceivedType r;
 	r = server->recvStatusLine();
@@ -252,9 +289,15 @@ bool Proxy::readServerResponse(){
 		}
 	return true;
 }
+
+/**
+ * Transfers the response from the webserver connection to the browser connection.
+ * Here there is filtering of headers.
+ */
 bool Proxy::transferServerResponseHeader(){
 	string *statusLine;
 	HeaderField *h;
+	isCompressed = false;
 
 	statusLine = server->getStatusLine();
 	browser->setStatusLine(statusLine);
@@ -264,11 +307,15 @@ bool Proxy::transferServerResponseHeader(){
 		h = filterHeaderFieldIn(h);
 		if(h)browser->addHeaderField(h);
 	}
+	if(isCompressed) shouldBeFiltered = false;
 	// Add Connection: Close
 	browser->addHeaderField("Connection", "Close");
 	return true;
 }
 
+/**
+ * Sends the webserver response header to the browser.
+ */
 bool Proxy::sendServerResponseHeader(){
 	browser->sendStatusLine();
 	browser->sendHeader();
@@ -276,6 +323,13 @@ bool Proxy::sendServerResponseHeader(){
 	return true;
 }
 
+/**
+ * Transfers data between two connections. This is used both for outgoing and incoming data.
+ * Handles both chunked transfers and reqular ones. If the transfer will be filtered
+ * the data isn't sent but saved in filterBuffer instead.
+ * It should be called multiple times and only transfers a little bit at each time to avoid
+ * buffering to much data. When it returns false there is no more data to send.
+ */
 bool Proxy::transferData(HttpConnection* from, HttpConnection *to){
 	string* data;
 	if(!chunkedTransfer && contentLength == 0){
@@ -283,14 +337,14 @@ bool Proxy::transferData(HttpConnection* from, HttpConnection *to){
 		return false;
 	}
 	if(chunkedTransfer){
-		if(!from->recvChunk(1024)){
+		if(!from->recvChunk(BUFFLENGTH)){
 			chunkedTransfer = false;
 			contentLength = 0;
 		}
 	}
 	else{
-		if(contentLength > 1024 || contentLength == -1){
-			from->recvData(1024);
+		if(contentLength > BUFFLENGTH || contentLength == -1){
+			from->recvData(BUFFLENGTH);
 		}
 		else{
 			from->recvData(contentLength);
@@ -314,6 +368,9 @@ bool Proxy::transferData(HttpConnection* from, HttpConnection *to){
 	else return false;
 }
 
+/**
+ * Send data to the browser. Data should be moved first with transferData()
+ */
 bool Proxy::sendServerResponseData(){
 	try{
 		browser->sendData();
@@ -338,6 +395,9 @@ void Proxy::closeServerConnection(){
 
 }
 
+/**
+ * Filter outgoing headers, from browser to webserver.
+ */
 HeaderField* Proxy::filterHeaderFieldOut(HeaderField* h){
 	static ci_string connectionToken;
 	ci_string name(h->first.c_str());
@@ -382,6 +442,9 @@ HeaderField* Proxy::filterHeaderFieldOut(HeaderField* h){
 	return h;
 }
 
+/**
+ * Filter incoming headers, from webserver to browser.
+ */
 HeaderField* Proxy::filterHeaderFieldIn(HeaderField* h){
 	static ci_string connectionToken;
 	ci_string name(h->first.c_str());
@@ -405,23 +468,35 @@ HeaderField* Proxy::filterHeaderFieldIn(HeaderField* h){
 		cerr << h->first << ": " << h->second << endl;
 		if(h->second.find("text") != string::npos){
 			shouldBeFiltered = true;
-			cerr << "Will filter." << endl;
 		}
 		else{
 			shouldBeFiltered = false;
 		}
 	}
+	else if(name == ci_string("Content-Encoding")){
+		ci_string coding(h->second.c_str());
+		if(coding != ci_string("") && coding != ci_string("identity")){
+			isCompressed = true;
+		}
+	}
 	return h;
 }
 
+/**
+ * Searches filerBuffer for the forbidden strings, which are in filterWords.
+ */
 bool Proxy::filterData(){
 	ci_string ci_filterBuffer(filterBuffer->c_str());
+	cerr << *filterBuffer << endl;
 	for(auto it = filterWords->begin(); it != filterWords->end(); ++it){
 		if(ci_filterBuffer.find(*it) != string::npos) return false;
 	}
 	return true;
 }
 
+/**
+ * Sends a HTTP 501 Not Implemented, used when any other request than GET and POST is received.
+ */
 void Proxy::send501NotImplented(){
 	browser->setStatusLine(new string("HTTP/1.1 501 Not Implemented"));
 	browser->addHeaderField("Connection", "Close");
@@ -429,6 +504,9 @@ void Proxy::send501NotImplented(){
 	browser->sendHeader();
 }
 
+/**
+ * Sends a HTTP 303 See Other response, used when a forbidden string is encountered.
+ */
 void Proxy::send303SeeOther(string location){
 	browser->setStatusLine(new string("HTTP/1.1 303 SeeOther"));
 	browser->addHeaderField("Location", location);
