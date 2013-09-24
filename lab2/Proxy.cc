@@ -206,6 +206,7 @@ bool Proxy::setupServerConnection(){
 
 	//cerr << "Connecting to: '" << serverHostname.c_str() << '\''<< endl;
 	if((rv = getaddrinfo(serverHostname.c_str(), serverPort.c_str(), &hints, &servinfo)) != 0){
+		freeaddrinfo(servinfo);
 		throw ProxyException(string("Remote server setup failed, getaddrinfo: ") + string(gai_strerror(rv)),
 				ProxyException::SETUP_SERVER_CONNECTION_ERROR);
 	}
@@ -225,6 +226,7 @@ bool Proxy::setupServerConnection(){
 		break;
 	}
 	if(p == nullptr){
+		freeaddrinfo(servinfo);
 		throw ProxyException(string("Remote server setup failed, failed to connect. Last error: ") + strerror(errno),
 						ProxyException::SETUP_SERVER_CONNECTION_ERROR);
 	}
@@ -439,7 +441,7 @@ HeaderField* Proxy::filterHeaderFieldIn(HeaderField* h){
 		delete h;
 		return nullptr;
 	}
-	else if(name == ci_string("Content-Type")){
+	else if(name == ci_string("Content-Type")){ // Check for filterable content.
 		cerr << h->first << ": " << h->second << endl;
 		if(h->second.find("text") != string::npos){
 			shouldBeFiltered = true;

@@ -81,7 +81,13 @@ void HttpConnection::sendHeader(){
 		sHeader.pop();
 	}
 	s->append("\r\n");
-	sendString(s);
+	try{
+		sendString(s);
+	}catch (...){
+		if(s) delete s;
+		s = nullptr;
+		throw;
+	}
 }
 void HttpConnection::addData(std::string *&s){
 	if(sData){

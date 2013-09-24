@@ -137,23 +137,28 @@ void Connection::sendString(std::string *&data){
 string *Connection::recvTerminatedString(char term){
 	string *s = new string();
 	char *hit;
-	for(;;){
-		if(rBuffLength == 0){
-			if(connected){
-				updateRBuff();
+	try{
+		for(;;){
+			if(rBuffLength == 0){
+				if(connected){
+					updateRBuff();
+				}
+				else{
+					break;
+				}
 			}
-			else{
+			hit = reinterpret_cast<char*>(memchr(reinterpret_cast<void*>(getRBuff()), term, rBuffLength));
+			if(hit){
+				appendRBuff(s, (hit - getRBuff()) + 1);
 				break;
 			}
+			else{
+				appendRBuff(s, rBuffLength);
+			}
 		}
-		hit = reinterpret_cast<char*>(memchr(reinterpret_cast<void*>(getRBuff()), term, rBuffLength));
-		if(hit){
-			appendRBuff(s, (hit - getRBuff()) + 1);
-			break;
-		}
-		else{
-			appendRBuff(s, rBuffLength);
-		}
+	}catch (...){
+		delete s;
+		throw;
 	}
 	return s;
 }
@@ -170,21 +175,26 @@ string *Connection::recvTerminatedString(char term){
  */
 string *Connection::recvString(size_t len){
 	string *s = new string();
-	for(;len > 0;){
-		if(rBuffLength == 0){
-			if(connected){
-				updateRBuff();
+	try{
+		for(;len > 0;){
+			if(rBuffLength == 0){
+				if(connected){
+					updateRBuff();
+				}
+				else break;
 			}
-			else break;
+			if(rBuffLength >= len){
+				appendRBuff(s, len);
+				len = 0;
+			}
+			else if(rBuffLength > 0){
+				len = len - rBuffLength;
+				appendRBuff(s, rBuffLength);
+			}
 		}
-		if(rBuffLength >= len){
-			appendRBuff(s, len);
-			len = 0;
-		}
-		else if(rBuffLength > 0){
-			len = len - rBuffLength;
-			appendRBuff(s, rBuffLength);
-		}
+	}catch (...){
+		delete s;
+		throw;
 	}
 	return s;
 }
