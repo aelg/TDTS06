@@ -1,0 +1,183 @@
+\documentclass[a4paper,11pt]{article}
+%\documentclass[a4paper,9pt,landscape]{article}
+\usepackage[english]{babel}
+%\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{fullpage}
+\usepackage{amsmath}
+\usepackage{pdfpages}
+\usepackage{listings}
+\usepackage{color}
+\usepackage{multicol}
+\usepackage{fancyhdr}
+\usepackage[top=1.5cm, bottom=4cm, left=2.5cm, right=2.5cm]{geometry}
+\usepackage{hyperref}
+\usepackage{verbatim}
+\setlength{\voffset}{-9pt}
+%\setlength{\hoffset}{-1in}
+%\setlength{\marginparsep}{0.5cm}
+
+
+\setlength{\parindent}{0cm}
+%\setlength{\parskip}{-0.1cm}
+%\setlength{\columnseprule}{0.4pt}
+\setlength{\footskip}{0.5cm}
+\setlength{\headheight}{15pt}
+\setlength{\headsep}{2cm}
+
+\fancypagestyle{tcr}{%
+  \fancyhf{} %clear all headers and footers fields
+  \fancyhead[R]{\thepage}
+  \fancyhead[L]{\textbf{Assignment No 2 TDTS06}}
+  \renewcommand{\headrulewidth}{0.4pt}
+}
+
+\definecolor{dkgreen}{rgb}{0,0.6,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{mauve}{rgb}{0.58,0,0.82}
+\lstset{
+  title=\lstname,
+  frame=t,
+  %aboveskip=-0.5cm, 
+  %belowskip=0pt,
+  basicstyle=\footnotesize\ttfamily,
+  keywordstyle=\color{blue},          % keyword style
+  commentstyle=\color{dkgreen},       % comment style
+  stringstyle=\color{mauve},         % string literal style
+  showstringspaces=false,         % underline spaces within strings
+  tabsize=2,
+  language=C,
+  title=\caption,
+  %xleftmargin=-1cm
+}
+
+
+\begin{document}
+%% title stuff
+\title{Assignment No 2 TDDC78}
+\author{Linus Mellberg (linme560)}
+\date{\today}
+\maketitle
+\pagebreak
+%\setcounter{page}{1}
+%\begin{multicols}{2}
+\thispagestyle{tcr}
+\pagestyle{tcr}
+%\tableofcontents
+
+\section{A simple web proxy with filtering}
+\subsection{User manual}
+\subsubsection{Building the proxy}
+Follow the instructions to build the proxy.
+\begin{itemize}
+  \item 
+    Extract the source code
+    \begin{verbatim}$ tar xvjf assignment2_proxy_Linus_Mellberg.tar.bz2
+  \end{verbatim}
+\item 
+  Go to the one of the build directories
+  The Debug directory will build the proxy with -g to enable debugging.
+  The Proxy directory will build the proxy with -O2 optimize for speed.
+  \begin{verbatim}$ cd proxy/Debug\end{verbatim}
+  or
+  \begin{verbatim}$ cd proxy/Release\end{verbatim}
+\item
+  Build the project.
+  \begin{verbatim}$ make\end{verbatim}
+  Make sure you have a c++11 compliant compiler.
+  The program isn't tested on the solaris machines, but it should compile on a standard Linux system with a new enough compiler and pthreads support.
+  On IDA solaris machines you might have to change the compiler.
+  \begin{verbatim}$ module rm prog/gcc
+$ module add prog/gcc/4\end{verbatim}
+\end{itemize}
+
+\subsubsection{Configuring and running the proxy}
+If the build succeded the proxy can be run by
+\begin{verbatim}$ ./proxy\end{verbatim}
+This will start the proxy listening to port 8080.
+Changing the default port can be done by specifing a port number as a parameter.
+\begin{verbatim}$ ./proxy 8081\end{verbatim}
+The words that the proxy will filter can be configured by editing \emph{filterWords.txt}.
+Each uncommented line will be treated as a string to be filtered. Each line can at most be 200 characters long.
+Comments can be made by starting a line with \#.
+To stop the proxy send a SIGINT signal by pressing ctrl+c, there will be some messages about it stopped accepting connections and exiting.
+This means that the main loop has stopped.
+If the proxy doesn't exit immediately some threads are still alive and handling connections.
+If they don't stop after a while try stopping the browser.
+If this doesn't work something has gone wrong and the proxy must be stopped by killing it for example use:
+\begin{verbatim}$ killall proxy\end{verbatim}
+
+\subsubsection{Source Code and features}
+The program is object oriented and consists of a number of classes. Each is declared and defined in .h and .cc files with corresponding names.
+\begin{itemize}
+  \item \emph{Connection} is a wrapper for the send and recv calls to a socket.
+    It handles buffering of received data. 
+    And can return strings of data with a certain length or ending witha  certain byte.
+    It can also send strings of data.
+  \item \emph{HttpConnection} does some simple HTTP handling. 
+    It can parse status lines, headers and then deliver data.
+    There is no handling or processing of HTTP here, only parsing.
+  \item \emph{Server} handles incoming connections. 
+    Setup of listening socket is done with init().
+    Each incoming connection must be accepted by calling acceptNew() which will return a Connection object.
+  \item \emph{Proxy} handles incoming browser connection.
+    When a connection to the browser has been set up a new thread is started. 
+    This thread will create a \emph{Proxy} object that will handle this connection until it is closed.
+    This is where most of the actual work is done. 
+  \item \emph{main.cc} is not an object but runs the basic loop which accepts new connection and dispatches them to new threads.
+\end{itemize}
+
+The proxy starts by reading the file \emph{filterWords.txt} to know what to filter.
+It configures some handling of POSIX signals to be able to shut down cleanly.
+Then it instantiates a Server object which starts listening on the port specified port (or 8080 by default).
+The main loop then starts accepting connections.
+For each new connection a new thread is started and detached.
+Each thread handles the connection by itself and will exit when it is done.
+This is done by the \emph{Proxy} object.
+
+The \emph{Proxy} object is started with a \emph{Connection} and a list of words to filter.
+It reads the browsers request and starts a connection to the requested server.
+The HTTP-request is relayed and the \emph{Connection} header is changed to have the value \emph{Close}.
+If the \emph{Accept} header field indicates that the response should contain text, the \emph{Accept-Encoding} header is changed to be empty.
+This will stop the web server from compressing the data, making it possible to filter the response.
+This migth be bad in terms of bandwidth usage but it makes it possible to filter a lot more pages. 
+Many modern web servers compress outgoing data, when this is supported by browsers.
+
+The request is then sent to the webserver.
+The response headers are read and again the \emph{Connection} header is changed to the value \emph{Close}. 
+This time the \emph{Content-Encoding} and \emph{Content-Type} header fields are checked to see if the response is either compressed or does contain text.
+This will decide if filtering will be done.
+If filtering will be done, the response data is buffered and filtered.
+Otherwise it is read 4096 bytes (or the amount that is received by recv) at a time and sent to the browser.
+
+This is a list of where the required features 2, 3, 6, 7 and 8 are implented.
+\begin{itemize}
+  \item Feauture 2 is implemented in mostly in \emph{Proxy.cc}, hard to give a single line.
+  \item Feauture 3 is implemented in \emph{Proxy.cc} on line 145.
+  \item Feauture 6 is implemented, there are no special treatment for any browser. Not testing in IE though.
+  \item Feauture 7 is implemented in \emph{main.cc} line 93 and \emph{Server.cc} line 60.
+  \item Feauture 8 is implemented in \emph{Proxy.cc} line ~413 checks for what the browser expects back and on line 177 Accept-Encoding is emptied if it is text.
+    Incoming data responses are checked at line ~444 and is filtered if Content-Type with text in it is found.
+    Filtering is done on line 63.
+    Buffering is done on line ~346.
+\end{itemize}
+
+\subsection{Functionality and testing}
+The proxy has been tested with Chromium and Firefox, both seem to work nicely.
+It has been tested on a few pages for example yahoo.com, wikipedia.org, aftonbladet.se and youtube.com.
+They all seem to work and are displayed as usual.
+Large file transfers has been tested with http://www.thinkbroadband.com/download.html the 1 GB file did download without problems.
+Google.com was also tested but this site uses HTTPS which isn't supported by the proxy.
+The proxy also works for HTTP connections to non standard ports, this has been tested by downloading the 1 GB test file above through port 81 (there is a link for this on the page).
+POST and GET request are supported, any other type of request will generate a HTTP Response with status code 501 Not Implemented.
+POST has been tested on http://www.w3schools.com/tags/tryit.asp?filename=tryhtml\_form\_submit the Submit Code button will perform a POST on the form.
+IPv6 is not supported.
+
+The proxy was also tested for memory leaks using valgrind, it seems clean.
+The filter word list is not freed, but this is intentional and not harmful, only one instance is created.
+It should be freed when the last thread exits. 
+Doing this would mean going through a lot of trouble to find out when there are no more threads, only to free a pointer right before program exit.
+
+%\clearpage
+
+\end{document}
